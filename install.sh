@@ -119,7 +119,7 @@ stage_install() {
     local csv="$REPO_ROOT/packages.csv"
     [[ -f "$csv" ]] || die "packages.csv not found at $csv"
 
-    mapfile -t rows < <(grep -Ev '^\s*(#|$)' "$csv")
+    mapfile -t rows < <(tail -n +2 "$csv" | grep -Ev '^\s*$')
     local total=${#rows[@]}
     (( total > 0 )) || die "no package rows found in $csv"
 

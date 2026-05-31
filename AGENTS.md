@@ -39,9 +39,8 @@ fail with the underlying error.
 
 ## packages.csv format
 
-Five columns, no header row, comma-separated, unquoted. **Fields must not
-contain commas.** Lines starting with `#` are comments and blanks are
-skipped.
+Five columns, comma-separated, unquoted, with a header row on line 1.
+**Fields must not contain commas.** Blank lines are skipped.
 
     tag,name,description,pre-install-script,post-install-script
 

@@ -34,7 +34,7 @@ TTY and run `startx` to launch i3.
 
 ## Adding a package
 
-Edit `packages.csv`. Five columns, comma-separated, no header:
+Edit `packages.csv`. Five columns, comma-separated, with a header row:
 
     tag,name,description,pre-install-script,post-install-script
 
@@ -45,8 +45,8 @@ Edit `packages.csv`. Five columns, comma-separated, no header:
 | `G` | `git clone` to `~/.local/src/<repo>` | clone URL |
 
 Hook columns hold paths to scripts under `hooks/` (relative to repo root),
-or are empty. Fields must not contain commas. Lines starting with `#` are
-comments.
+or are empty. Fields must not contain commas. The runner skips the header
+row and blank lines.
 
 ## Structure
 

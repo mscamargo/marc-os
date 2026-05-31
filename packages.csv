@@ -1,40 +1,23 @@
-# marc-os package list
-# Schema: tag,name,description,pre-install-script,post-install-script
-# Tags: blank = pacman, A = AUR (yay), G = git clone to ~/.local/src
-# Comments start with #. Fields must not contain commas.
-
-# Xorg
+tag,name,description,pre-install-script,post-install-script
 ,xorg-server,X.Org display server,,
 ,xorg-xinit,startx and xinit helpers,,
 ,xorg-xrandr,RandR CLI for display config,,
 ,xorg-xsetroot,Root window utility,,
-
-# Audio
 ,pipewire,Modern audio/video server,,
 ,pipewire-pulse,PulseAudio replacement for PipeWire,,
 ,wireplumber,PipeWire session manager,,
 ,alsa-utils,Userspace ALSA utilities,,
-
-# Power and brightness
 ,brightnessctl,Backlight and LED brightness control,,
 ,acpi,Battery and thermal info CLI,,
-
-# Fonts
 ,noto-fonts,Google Noto base fonts,,
 ,noto-fonts-emoji,Google Noto color emoji,,
 ,ttf-hack,Hack monospace font,,
 ,ttf-jetbrains-mono,JetBrains Mono font,,
-
-# Shell
 ,zsh,Z shell,,
 ,zsh-completions,Extra zsh completions,,
 ,zsh-syntax-highlighting,zsh syntax highlighting,,
 ,zsh-autosuggestions,zsh autosuggestions,,
-
-# Editor
 ,neovim,Hyperextensible Vim-based editor,,
-
-# Window manager stack
 ,i3-wm,i3 tiling window manager,,
 ,i3status,Status bar generator for i3,,
 ,i3lock,Screen locker,,
@@ -45,36 +28,22 @@
 ,polkit-gnome,GNOME polkit authentication agent,,
 ,autorandr,Auto-apply display profiles,,
 ,arandr,GUI for xrandr,,
-
-# Terminal
 ,alacritty,GPU-accelerated terminal emulator,,
-
-# Browsers
 ,qutebrowser,Keyboard-driven Qt browser,,
 ,firefox,Mozilla Firefox,,
 ,chromium,Open-source Chromium browser,,
-
-# File managers
 ,yazi,Terminal file manager,,
 ,lf,Terminal file manager,,
 ,ranger,VIM-inspired file manager,,
-
-# Screenshot / clipboard / input
 ,maim,Screenshot utility,,
 ,slop,Region selection for screenshots,,
 ,xclip,X11 clipboard CLI,,
 ,xdotool,X11 keyboard/mouse simulator,,
 ,clipmenu,Clipboard manager using dmenu/rofi,,
 ,playerctl,MPRIS media player CLI,,
-
-# XDG utilities
 ,xdg-utils,XDG desktop integration scripts,,
 ,xdg-user-dirs,Manage XDG user directories,,
-
-# System services
 ,networkmanager,Network connection manager,,hooks/enable-networkmanager.sh
 ,bluez,Bluetooth protocol stack,,hooks/enable-bluetooth.sh
 ,bluez-utils,Bluetooth utilities (bluetoothctl),,
-
-# AUR
 A,google-chrome,Google Chrome browser,,
