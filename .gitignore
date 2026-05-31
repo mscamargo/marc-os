@@ -1,12 +1,3 @@
-# Build artifacts
-src/dwm/*.o
-src/dmenu/*.o
-src/st/*.o
-src/dwm/dwm
-src/dmenu/dmenu
-src/dmenu/stest
-src/st/st
-
 # Backups
 *.backup.*
 
