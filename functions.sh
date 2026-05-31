@@ -13,6 +13,8 @@ source "$REPO_ROOT/lib/log.sh"
 source "$REPO_ROOT/lib/util.sh"
 # shellcheck source=lib/sudo.sh
 source "$REPO_ROOT/lib/sudo.sh"
+# shellcheck source=lib/packages.sh
+source "$REPO_ROOT/lib/packages.sh"
 
 info()             { log::info "$1"; }
 warn()             { log::warn "$1"; }
@@ -21,27 +23,8 @@ success()          { log::success "$1"; }
 die()              { log::die "$1"; }
 assert_non_root()  { log::assert_non_root; }
 check_command()    { util::has_command "$1"; }
-
-pacman_install() {
-    info "Installing: $*"
-    sudo pacman -S --needed --noconfirm "$@"
-}
-
-# Enable and start a systemd unit idempotently.
-enable_service() {
-    local unit="$1"
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
-        if systemctl is-active --quiet "$unit" 2>/dev/null; then
-            info "$unit already enabled and active"
-            return 0
-        fi
-        info "Starting: $unit"
-        sudo systemctl start "$unit"
-        return 0
-    fi
-    info "Enabling and starting: $unit"
-    sudo systemctl enable --now "$unit"
-}
+pacman_install()   { pkg::install_pacman "$@"; }
+enable_service()   { pkg::enable_service "$1"; }
 
 # Replace any ancestor of $dest that is a symlink pointing into $REPO_ROOT
 # with a real directory. Stops at $HOME. Handles the legacy state where a

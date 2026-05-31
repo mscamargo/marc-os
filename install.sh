@@ -42,71 +42,17 @@ check() {
 
 # ---------- bootstrap ----------
 
-tune_pacman_conf() {
-    local conf=/etc/pacman.conf
-    [[ -f "$conf" ]] || die "$conf not found"
-
-    info "Tuning $conf"
-
-    local opt
-    for opt in Color VerbosePkgLists ParallelDownloads; do
-        if grep -qE "^${opt}\b" "$conf"; then
-            info "  $opt: already enabled"
-        elif grep -qE "^#\s*${opt}\b" "$conf"; then
-            sudo sed -i -E "s/^#\s*(${opt}\b)/\1/" "$conf"
-            info "  Enabled: $opt"
-        else
-            warn "  $opt: pattern not found, skipping"
-        fi
-    done
-
-    if grep -qE "^ILoveCandy\b" "$conf"; then
-        info "  ILoveCandy: already enabled"
-    else
-        sudo sed -i -E "/^\[options\]/a ILoveCandy" "$conf"
-        info "  Enabled: ILoveCandy"
-    fi
-
-    if grep -qE "^\[multilib\]" "$conf"; then
-        info "  [multilib]: already enabled"
-    elif grep -qE "^#\s*\[multilib\]" "$conf"; then
-        sudo sed -i -E "/^#\s*\[multilib\]/,/^$/{s/^#\s*//}" "$conf"
-        info "  Enabled: [multilib]"
-    else
-        warn "  [multilib]: pattern not found, skipping"
-    fi
-}
-
-refresh_keyring() {
-    info "Refreshing archlinux-keyring"
-    sudo pacman -S --needed --noconfirm archlinux-keyring
-}
-
 bootstrap() {
-    tune_pacman_conf
-    refresh_keyring
+    pkg::tune_pacman_conf /etc/pacman.conf
+    pkg::refresh_keyring
 
     info "Updating system"
     sudo pacman -Syu --noconfirm
 
     info "Installing AUR helper prerequisites"
-    pacman_install base-devel git
+    pkg::install_pacman base-devel git
 
-    if check_command yay; then
-        info "yay is already installed"
-        return 0
-    fi
-
-    info "Bootstrapping yay AUR helper"
-    (
-        tmp=$(mktemp -d)
-        trap 'rm -rf "$tmp"' EXIT
-        cd "$tmp"
-        git clone https://aur.archlinux.org/yay.git
-        cd yay
-        makepkg -si --noconfirm
-    )
-    success "yay installed"
+    pkg::bootstrap_aur_helper
 }
 
 # ---------- install ----------
