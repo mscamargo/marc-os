@@ -1,4 +1,6 @@
 tag,name,description
+# Lines starting with '#' or blank are skipped. tag: blank=pacman, A=AUR, G=git.
+# Hook keys derive from `name` (or repo basename for G); names with '.' break that.
 ,xorg-server,X.Org display server
 ,xorg-xinit,startx and xinit helpers
 ,xorg-xrandr,RandR CLI for display config
@@ -47,3 +49,25 @@ tag,name,description
 ,bluez,Bluetooth protocol stack
 ,bluez-utils,Bluetooth utilities (bluetoothctl)
 A,google-chrome,Google Chrome browser
+,openssh,SSH client and server
+,fzf,Command-line fuzzy finder
+,ripgrep,Fast recursive grep
+,fd,Fast find replacement
+,bat,cat clone with syntax highlighting
+,eza,Modern ls replacement
+,jq,JSON processor
+,yq,YAML/XML/TOML processor
+,github-cli,GitHub command-line tool
+,git-delta,Syntax-highlighting pager for git diffs
+,lazygit,Terminal UI for git
+,tmux,Terminal multiplexer
+,btop,Resource monitor
+,httpie,Human-friendly HTTP client
+,bind,DNS tools including dig
+,nmap,Network exploration and security scanner
+,python-pipx,Install Python apps in isolated venvs
+,uv,Fast Python package and project manager
+,docker,Container runtime
+,docker-compose,Multi-container Docker apps
+A,mise,Polyglot runtime version manager
+,shellcheck,Static analysis for shell scripts

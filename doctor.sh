@@ -33,7 +33,7 @@ while IFS= read -r row; do
             warn "unknown tag '$PARSED_TAG' for $PARSED_NAME"
             ;;
     esac
-done < <(tail -n +2 "$csv" | grep -Ev '^\s*$')
+done < <(tail -n +2 "$csv" | grep -Ev '^\s*(#|$)')
 
 src_root="$REPO_ROOT/dotfiles"
 if [[ -d "$src_root" ]]; then
