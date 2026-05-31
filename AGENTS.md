@@ -7,25 +7,35 @@ symlink dotfiles. No package manager, no tests, no CI.
 
 | Path | Purpose |
 |------|---------|
-| `install.sh` | Entry point. Sources `lib/common.sh`, runs `scripts/*.sh` in glob order. |
-| `scripts/NN-*.sh` | Numbered setup steps. Must be `chmod +x` or `install.sh` skips them. |
-| `lib/common.sh` | Shared helpers: `info`, `warn`, `die`, `pacman_install`, `link_dotfile`. |
-| `packages.csv` | LARBS-style package manifest consumed by `scripts/03-packages.sh`. |
+| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip` filters. |
+| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `link_dotfile`, `run_hook`. Sourced by `install.sh` and each hook. |
+| `packages.csv` | LARBS-style package manifest consumed by `stage_install`. |
 | `hooks/` | Optional pre/post-install scripts referenced from `packages.csv`. |
-| `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `scripts/04-dotfiles.sh`. |
+| `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `stage_configure`. |
 | `config/bin/` | Custom executable scripts. Linked into `$HOME/.local/bin/`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
 
-## Script order
+## Stages
 
-| # | Script | Purpose |
-|---|--------|---------|
-| 00 | `00-check.sh`     | Pre-flight: Arch, non-root, pacman, git, internet. |
-| 01 | `01-base.sh`      | `pacman -Syu` and AUR-helper prerequisites (`base-devel`, `git`). |
-| 02 | `02-aur-helper.sh`| Bootstrap `yay`. |
-| 03 | `03-packages.sh`  | Iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
-| 04 | `04-dotfiles.sh`  | Symlink `config/` into `$HOME` and `$HOME/.config/`. |
-| 05 | `05-shell.sh`     | `chsh -s zsh`. |
+`install.sh` defines `STAGES=(check bootstrap install configure)` and runs them
+in that order. Each is a function named `stage_<name>`.
+
+| Stage | Purpose |
+|-------|---------|
+| `check`     | Pre-flight: Arch, non-root, pacman, git, internet. |
+| `bootstrap` | `pacman -Syu`, install `base-devel` + `git`, bootstrap `yay`. |
+| `install`   | Iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
+| `configure` | Symlink `config/` into `$HOME` / `$HOME/.config/`, then `chsh -s zsh`. |
+
+### CLI flags
+
+- `--only STAGE[,STAGE...]` — allow-list.
+- `--skip STAGE[,STAGE...]` — deny-list (wins over `--only`).
+- `-h` / `--help` — usage.
+
+Unknown flags and unknown stage names exit non-zero. Dependencies between
+stages are **not** validated; running `--only configure` on a bare system will
+fail with the underlying error.
 
 ## packages.csv format
 
@@ -44,29 +54,32 @@ skipped.
 Hook columns are paths relative to repo root (e.g. `hooks/enable-bluetooth.sh`).
 Empty cell = no hook. Hooks run as `bash "$REPO_ROOT/<path>"` with these env
 vars exported: `PKG_NAME`, `PKG_TAG`, `PKG_DESC`; for `G` rows, `SRC_DIR` is
-also set to the clone target. Hooks should source `lib/common.sh` for shared
+also set to the clone target. Hooks should `source ../functions.sh` for shared
 helpers.
 
-The runner skips rows whose package is already installed (`pacman -Qq`) or
+`stage_install` skips rows whose package is already installed (`pacman -Qq`) or
 whose `SRC_DIR` already exists. Row failures are collected and reported in a
-final summary; the run continues after each failure and exits non-zero if any
-row failed.
+final summary; the run continues after each failure and the stage exits
+non-zero if any row failed. Other stages are fail-fast.
 
 ## Critical workflow details
 
 ### Install script behavior
 - Runs only on Arch Linux, as a regular user (not root). Uses `sudo` internally.
-- Scripts run in glob order (`00-check.sh` → `01-base.sh` …). Numbering matters.
-- Any non-executable `.sh` in `scripts/` is skipped with a warning.
-- `install.sh` sets `set -euo pipefail`; individual scripts do too.
+- `install.sh` sets `set -euo pipefail`; `functions.sh` does not (it is a sourced library).
+- All four stages are idempotent: re-running is safe.
 
 ### Dotfile linking
-- `link_dotfile` in `lib/common.sh` symlinks with `ln -sfn`.
+- `link_dotfile` in `functions.sh` symlinks with `ln -sfn`.
 - If a real file (not symlink) already exists at the destination, it is backed up to `$dest.backup.<timestamp>`.
 
 ### i3 launch flow
 - TTY login → `startx` → `~/.xinitrc` (`exec i3`).
 - i3 spawns daemons (`picom`, `dunst`, `clipmenud`, `polkit-gnome` agent, `xss-lock -- i3lock`) via `exec`, and re-applies `xsetroot` and `xset s 300` via `exec_always`.
+
+### Adding helpers
+- Put reusable helpers in `functions.sh` so both `install.sh` and hooks see them.
+- Stage-local helpers live in `install.sh` next to the stage function that calls them (e.g. `install_row` next to `stage_install`).
 
 ## VM testing
 
