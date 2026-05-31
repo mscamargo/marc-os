@@ -8,19 +8,21 @@ STAGES=(check bootstrap install configure)
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--only STAGE[,STAGE...]] [--skip STAGE[,STAGE...]] [-h|--help]
+Usage: $(basename "$0") [--only STAGE[,STAGE...]] [--skip STAGE[,STAGE...]] [--dry-run] [-h|--help]
 
 Stages (run in order):
   check       Pre-flight: Arch Linux, non-root, pacman/git, internet
   bootstrap   pacman -Syu, install base-devel + git, bootstrap yay
   install     Install every row in packages.csv; run per-row hooks
-  configure   Symlink dotfiles into \$HOME / \$HOME/.config; set zsh as default
+  configure   Leaf-symlink everything under dotfiles/ into \$HOME, prune
+              stale symlinks that resolve into the repo, set zsh as default
 
 By default all stages run, in order.
 
   --only      Comma-separated list of stages to run (others skipped).
   --skip      Comma-separated list of stages to skip.
               --skip wins on conflicts with --only.
+  --dry-run   Print link / prune / migrate / chsh ops instead of executing.
   -h, --help  Show this message.
 EOF
 }
@@ -154,33 +156,41 @@ stage_install() {
 # ---------- stage: configure ----------
 
 stage_configure() {
-    local cfg="$REPO_ROOT/config"
+    local src_root="$REPO_ROOT/dotfiles"
+    [[ -d "$src_root" ]] || die "dotfiles/ not found at $src_root"
 
-    info "Linking dotfiles"
+    info "Linking dotfiles from $src_root into \$HOME"
 
-    link_dotfile "$cfg/x11/.xinitrc"  "$HOME/.xinitrc"
-    link_dotfile "$cfg/zsh/.zshrc"    "$HOME/.zshrc"
-    link_dotfile "$cfg/zsh/.zprofile" "$HOME/.zprofile"
+    local file rel dest
+    while IFS= read -r -d '' file; do
+        rel="${file#"$src_root"/}"
+        dest="$HOME/$rel"
+        link_dotfile "$file" "$dest"
+    done < <(find "$src_root" -type f -print0)
 
-    local name
-    for name in nvim i3 i3status alacritty rofi dunst picom qutebrowser; do
-        link_dotfile "$cfg/$name" "$HOME/.config/$name"
+    info "Pruning stale symlinks"
+    # Top-level dotfiles in $HOME (depth 1) — catches stale ~/.zshrc-style links.
+    prune_stale_links_in "$HOME" 1
+    # Each top-level entry in dotfiles/ that's a directory maps to a target
+    # tree we own; walk it recursively for stale leaves.
+    local entry name target
+    for entry in "$src_root"/* "$src_root"/.*; do
+        name="$(basename "$entry")"
+        [[ "$name" == "." || "$name" == ".." ]] && continue
+        [[ -d "$entry" ]] || continue
+        target="$HOME/$name"
+        [[ -d "$target" ]] || continue
+        prune_stale_links_in "$target"
     done
 
-    mkdir -p "$HOME/.local/bin"
-    if [[ -d "$cfg/bin" ]]; then
-        local script
-        for script in "$cfg/bin"/*; do
-            [[ -f "$script" ]] && link_dotfile "$script" "$HOME/.local/bin/$(basename "$script")"
-        done
-    fi
-
-    success "Dotfiles linked"
+    success "Dotfiles configured"
 
     local zsh_path
     zsh_path="$(command -v zsh)"
     if [[ "$SHELL" == "$zsh_path" ]]; then
         info "zsh is already the default shell"
+    elif (( DRY_RUN )); then
+        info "[dry-run] would change default shell to zsh ($zsh_path)"
     else
         info "Changing default shell to zsh"
         chsh -s "$zsh_path"
@@ -206,6 +216,7 @@ validate_stages() {
 
 main() {
     local only="" skip=""
+    DRY_RUN=0
     while (( $# > 0 )); do
         case "$1" in
             --only)
@@ -214,10 +225,12 @@ main() {
             --skip)
                 [[ $# -ge 2 ]] || die "--skip requires an argument"
                 skip="$2"; shift 2 ;;
+            --dry-run) DRY_RUN=1; shift ;;
             -h|--help) usage; exit 0 ;;
             *) error "unknown option: $1"; usage >&2; exit 2 ;;
         esac
     done
+    export DRY_RUN
 
     validate_stages "--only" "$only"
     validate_stages "--skip" "$skip"
