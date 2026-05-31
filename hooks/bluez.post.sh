@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=SCRIPTDIR/../functions.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../functions.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../functions.sh"
-
-info "Enabling bluetooth.service"
-sudo systemctl enable --now bluetooth.service
+enable_service bluetooth.service

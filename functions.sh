@@ -40,6 +40,30 @@ pacman_install() {
     sudo pacman -S --needed --noconfirm "$@"
 }
 
+# Enable and start a systemd unit idempotently. Honors DRY_RUN.
+enable_service() {
+    local unit="$1"
+    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+        if systemctl is-active --quiet "$unit" 2>/dev/null; then
+            info "$unit already enabled and active"
+            return 0
+        fi
+        if (( DRY_RUN )); then
+            info "[dry-run] would start: $unit"
+        else
+            info "Starting: $unit"
+            sudo systemctl start "$unit"
+        fi
+        return 0
+    fi
+    if (( DRY_RUN )); then
+        info "[dry-run] would enable and start: $unit"
+        return 0
+    fi
+    info "Enabling and starting: $unit"
+    sudo systemctl enable --now "$unit"
+}
+
 : "${DRY_RUN:=0}"
 
 # Returns 0 if any ancestor of $dest (up to $HOME) is a symlink resolving
