@@ -2,7 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/functions.sh"
+# shellcheck source=lib/log.sh
+source "$SCRIPT_DIR/lib/log.sh"
+# shellcheck source=lib/dotfiles.sh
+source "$SCRIPT_DIR/lib/dotfiles.sh"
 
-assert_non_root
-configure_dotfiles
+log::assert_non_root
+dot::configure "$SCRIPT_DIR/dotfiles" "$HOME"

@@ -2,10 +2,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/functions.sh"
+# shellcheck source=lib/log.sh
+source "$SCRIPT_DIR/lib/log.sh"
+# shellcheck source=lib/util.sh
+source "$SCRIPT_DIR/lib/util.sh"
+# shellcheck source=lib/sudo.sh
+source "$SCRIPT_DIR/lib/sudo.sh"
+# shellcheck source=lib/packages.sh
+source "$SCRIPT_DIR/lib/packages.sh"
+# shellcheck source=lib/dotfiles.sh
+source "$SCRIPT_DIR/lib/dotfiles.sh"
 
 usage() {
-    cat <<EOF
+    cat << EOF
 Usage: $(basename "$0") [-h|--help]
 
 End-to-end new-machine setup, run in order:
@@ -29,15 +38,15 @@ EOF
 # ---------- check ----------
 
 check() {
-    info "Running pre-flight checks"
+    log::info "Running pre-flight checks"
 
-    [[ -f /etc/arch-release ]] || die "This script is intended for Arch Linux only."
-    assert_non_root
-    check_command pacman || die "pacman not found. Is this Arch Linux?"
-    check_command git || die "git is required but not installed. Install it first: sudo pacman -S git"
-    ping -c 1 -W 2 archlinux.org &>/dev/null || die "No internet connection detected."
+    [[ -f /etc/arch-release ]] || log::die "This script is intended for Arch Linux only."
+    log::assert_non_root
+    util::has_command pacman || log::die "pacman not found. Is this Arch Linux?"
+    util::has_command git || log::die "git is required but not installed. Install it first: sudo pacman -S git"
+    ping -c 1 -W 2 archlinux.org &> /dev/null || log::die "No internet connection detected."
 
-    success "Pre-flight checks passed"
+    log::success "Pre-flight checks passed"
 }
 
 # ---------- bootstrap ----------
@@ -46,10 +55,10 @@ bootstrap() {
     pkg::tune_pacman_conf /etc/pacman.conf
     pkg::refresh_keyring
 
-    info "Updating system"
+    log::info "Updating system"
     sudo pacman -Syu --noconfirm
 
-    info "Installing AUR helper prerequisites"
+    log::info "Installing AUR helper prerequisites"
     pkg::install_pacman base-devel git
 
     pkg::bootstrap_aur_helper
@@ -65,7 +74,7 @@ install_row() {
 
     local key already=0
     case "$tag" in
-        ""|A)
+        "" | A)
             key="$name"
             pkg::is_installed_pacman "$name" && already=1
             ;;
@@ -75,71 +84,56 @@ install_row() {
             pkg::is_installed_git_src "$key" && already=1
             ;;
         *)
-            error "[$i/$total] unknown tag '$tag' for $name"
+            log::error "[$i/$total] unknown tag '$tag' for $name"
             return 1
             ;;
     esac
 
-    if (( already )); then
-        info "[$i/$total] $name: already installed"
+    if ((already)); then
+        log::info "[$i/$total] $name: already installed"
     else
-        info "[$i/$total] Installing $name: $desc"
+        log::info "[$i/$total] Installing $name: $desc"
     fi
 
-    local hooks_dir="$REPO_ROOT/hooks"
+    local hooks_dir="$SCRIPT_DIR/hooks"
     pkg::run_pre_hook "$key" "$hooks_dir" || return 1
 
-    if (( ! already )); then
+    if ((!already)); then
         case "$tag" in
-            "")  pkg::install_pacman  "$name"                   || return 1 ;;
-            A)   pkg::install_aur     "$name"                   || return 1 ;;
-            G)   pkg::install_git_src "$name" "$PKG_SRC_ROOT"   || return 1 ;;
+            "") pkg::install_pacman "$name" || return 1 ;;
+            A) pkg::install_aur "$name" || return 1 ;;
+            G) pkg::install_git_src "$name" "$PKG_SRC_ROOT" || return 1 ;;
         esac
     fi
 
     pkg::run_post_hook "$key" "$hooks_dir" || return 1
 }
 
-stop_sudo_keepalive() {
-    [[ -n "${SUDO_KEEPALIVE_PID:-}" ]] || return 0
-    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
-    wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
-    unset SUDO_KEEPALIVE_PID
-}
-
-start_sudo_keepalive() {
-    sudo -v || die "sudo authentication failed"
-    ( while true; do sudo -n true 2>/dev/null || exit; sleep 60; done ) &
-    SUDO_KEEPALIVE_PID=$!
-    trap stop_sudo_keepalive EXIT
-}
-
 install_packages() {
-    local csv="$REPO_ROOT/packages.csv"
-    [[ -f "$csv" ]] || die "packages.csv not found at $csv"
+    local csv="$SCRIPT_DIR/packages.csv"
+    [[ -f "$csv" ]] || log::die "packages.csv not found at $csv"
 
     mapfile -t rows < <(tail -n +2 "$csv" | grep -Ev '^\s*(#|$)')
     local total=${#rows[@]}
-    (( total > 0 )) || die "no package rows found in $csv"
+    ((total > 0)) || log::die "no package rows found in $csv"
 
-    info "Installing $total packages from packages.csv"
+    log::info "Installing $total packages from packages.csv"
 
-    start_sudo_keepalive
+    sudo::keepalive_start
 
-    local failed=()
-    local i=0 row
+    local failed=() i=0 row tag name desc
     for row in "${rows[@]}"; do
         i=$((i + 1))
-        parse_row "$row"
-        if ! install_row "$PARSED_TAG" "$PARSED_NAME" "$PARSED_DESC" "$i" "$total"; then
-            failed+=("$PARSED_NAME")
+        IFS=',' read -r tag name desc <<< "$row"
+        if ! install_row "$tag" "$name" "$desc" "$i" "$total"; then
+            failed+=("$name")
         fi
     done
 
-    stop_sudo_keepalive
+    sudo::keepalive_stop
 
-    if (( ${#failed[@]} > 0 )); then
-        error "Failed rows (${#failed[@]}/${total}):"
+    if ((${#failed[@]} > 0)); then
+        log::error "Failed rows (${#failed[@]}/${total}):"
         local f
         for f in "${failed[@]}"; do
             printf "  - %s\n" "$f" >&2
@@ -147,7 +141,7 @@ install_packages() {
         return 1
     fi
 
-    success "All $total packages installed"
+    log::success "All $total packages installed"
 }
 
 # ---------- shell ----------
@@ -156,21 +150,28 @@ setup_shell() {
     local zsh_path
     zsh_path="$(command -v zsh)"
     if [[ "$SHELL" == "$zsh_path" ]]; then
-        info "zsh is already the default shell"
+        log::info "zsh is already the default shell"
         return 0
     fi
-    info "Changing default shell to zsh"
+    log::info "Changing default shell to zsh"
     chsh -s "$zsh_path"
-    success "Default shell changed to zsh"
+    log::success "Default shell changed to zsh"
 }
 
 # ---------- main ----------
 
 main() {
-    while (( $# > 0 )); do
+    while (($# > 0)); do
         case "$1" in
-            -h|--help) usage; exit 0 ;;
-            *) error "unknown option: $1"; usage >&2; exit 2 ;;
+            -h | --help)
+                usage
+                exit 0
+                ;;
+            *)
+                log::error "unknown option: $1"
+                usage >&2
+                exit 2
+                ;;
         esac
     done
 
@@ -180,16 +181,16 @@ main() {
     log_file="$log_dir/install-$(date +%Y%m%d-%H%M%S).log"
     exec > >(tee -a "$log_file") 2> >(tee -a "$log_file" >&2)
 
-    info "Starting marc-os setup"
-    info "Logging to $log_file"
+    log::info "Starting marc-os setup"
+    log::info "Logging to $log_file"
 
     check
     bootstrap
     install_packages
     setup_shell
-    configure_dotfiles
+    dot::configure "$SCRIPT_DIR/dotfiles" "$HOME"
 
-    success "Setup complete. Restart your shell or run: exec zsh -l"
+    log::success "Setup complete. Restart your shell or run: exec zsh -l"
 }
 
 main "$@"
