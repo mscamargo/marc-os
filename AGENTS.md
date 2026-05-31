@@ -7,12 +7,12 @@ symlink dotfiles. No package manager, no tests, no CI.
 
 | Path | Purpose |
 |------|---------|
-| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip` filters. |
-| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `link_dotfile`. Sourced by `install.sh` and each hook. |
+| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip`/`--dry-run` flags. |
+| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `link_dotfile`, `migrate_ancestor_symlinks`, `prune_stale_links_in`. Sourced by `install.sh` and each hook. |
 | `packages.csv` | LARBS-style package manifest consumed by `stage_install`. |
 | `hooks/` | Optional pre/post-install scripts. Discovered by filename: `hooks/<package>.pre.sh` and `hooks/<package>.post.sh`. |
-| `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `stage_configure`. |
-| `config/bin/` | Custom executable scripts. Linked into `$HOME/.local/bin/`. |
+| `dotfiles/` | Mirrors `$HOME`. Every file is leaf-symlinked into place by `stage_configure`. |
+| `check.sh` | Ad-hoc `shellcheck` runner over all `*.sh`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
 
 ## Stages
@@ -25,12 +25,13 @@ in that order. Each is a function named `stage_<name>`.
 | `check`     | Pre-flight: Arch, non-root, pacman, git, internet. |
 | `bootstrap` | `pacman -Syu`, install `base-devel` + `git`, bootstrap `yay`. |
 | `install`   | Iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
-| `configure` | Symlink `config/` into `$HOME` / `$HOME/.config/`, then `chsh -s zsh`. |
+| `configure` | Leaf-symlink every file under `dotfiles/` into the mirrored path in `$HOME`, prune stale symlinks resolving into the repo, then `chsh -s zsh`. |
 
 ### CLI flags
 
 - `--only STAGE[,STAGE...]` — allow-list.
 - `--skip STAGE[,STAGE...]` — deny-list (wins over `--only`).
+- `--dry-run` — exported as `DRY_RUN=1`; `link_dotfile`, `prune_stale_links_in`, `migrate_ancestor_symlinks`, and the `chsh` step print intended ops instead of executing.
 - `-h` / `--help` — usage.
 
 Unknown flags and unknown stage names exit non-zero. Dependencies between
@@ -80,8 +81,11 @@ ambiguous. No current package has one.
 - All four stages are idempotent: re-running is safe.
 
 ### Dotfile linking
-- `link_dotfile` in `functions.sh` symlinks with `ln -sfn`.
+- `stage_configure` runs `find dotfiles -type f` and translates each repo path `dotfiles/X` to target `$HOME/X`. The set of dotfiles is implicit in the directory tree; there is no list to edit.
+- `link_dotfile` calls `migrate_ancestor_symlinks` first to replace any ancestor of the target that is a symlink resolving into `$REPO_ROOT` with a real directory (one-shot migration from the legacy dir-symlink layout). Then it `ln -sfn`s the leaf.
 - If a real file (not symlink) already exists at the destination, it is backed up to `$dest.backup.<timestamp>`.
+- After linking, `prune_stale_links_in` scans `$HOME` at depth 1 (catches stale top-level dotfiles) and each `$HOME/<name>/` whose `dotfiles/<name>/` is a directory (catches stale leaves). A link is pruned iff its `readlink -f` resolves into `$REPO_ROOT` and the target file is gone.
+- All of `link_dotfile`, `migrate_ancestor_symlinks`, and `prune_stale_links_in` honor `DRY_RUN=1`: they `info` the intended op and return without touching the filesystem.
 
 ### i3 launch flow
 - TTY login → `startx` → `~/.xinitrc` (`exec i3`).
