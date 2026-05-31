@@ -41,7 +41,7 @@ if [[ -d "$src_root" ]]; then
         rel="${file#"$src_root"/}"
         dest="$HOME/$rel"
         if [[ -L "$dest" ]]; then
-            target="$(readlink -f -- "$dest" 2>/dev/null || true)"
+            target="$(dot::readlink_target "$dest")"
             if [[ "$target" != "$file" ]]; then
                 warn "wrong link target: $dest -> ${target:-<broken>} (expected $file)"
                 wrong_links+=1
@@ -74,7 +74,7 @@ if [[ -d "$src_root" ]]; then
         fi
         find_args+=(-type l -print0)
         while IFS= read -r -d '' link; do
-            target="$(readlink -f -- "$link" 2>/dev/null || true)"
+            target="$(dot::readlink_target "$link")"
             if [[ -n "$target" && "$target" == "$REPO_ROOT"* && ! -e "$target" ]]; then
                 warn "orphan link: $link -> $target"
                 orphans+=1
