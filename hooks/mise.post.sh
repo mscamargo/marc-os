@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# shellcheck source=SCRIPTDIR/../functions.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../functions.sh"
+__HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/../lib/log.sh
+source "$__HOOK_DIR/../lib/log.sh"
+# shellcheck source=SCRIPTDIR/../lib/util.sh
+source "$__HOOK_DIR/../lib/util.sh"
 
-if ! check_command mise; then
-    error "mise not on PATH; cannot materialize tools"
+if ! util::has_command mise; then
+    log::error "mise not on PATH; cannot materialize tools"
     exit 1
 fi
 
 cfg="$HOME/.config/mise/config.toml"
 if [[ ! -f "$cfg" ]]; then
-    warn "mise config.toml not found at $cfg; skipping mise install"
-    warn "Re-run after dotfiles are linked (configure.sh)"
+    log::warn "mise config.toml not found at $cfg; skipping mise install"
+    log::warn "Re-run after dotfiles are linked (configure.sh)"
     exit 0
 fi
 
-info "Installing mise-managed runtimes from $cfg"
+log::info "Installing mise-managed runtimes from $cfg"
 mise install
 
-info "Enabling corepack via mise-managed node"
-mise exec node -- corepack enable || warn "corepack enable failed (non-fatal)"
+log::info "Enabling corepack via mise-managed node"
+mise exec node -- corepack enable || log::warn "corepack enable failed (non-fatal)"

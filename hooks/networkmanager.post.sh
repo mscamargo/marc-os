@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# shellcheck source=SCRIPTDIR/../functions.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../functions.sh"
+__HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/../lib/packages.sh
+source "$__HOOK_DIR/../lib/packages.sh"
 
-enable_service NetworkManager.service
+pkg::enable_service NetworkManager.service

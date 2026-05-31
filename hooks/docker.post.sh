@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# shellcheck source=SCRIPTDIR/../functions.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../functions.sh"
+__HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/../lib/packages.sh
+source "$__HOOK_DIR/../lib/packages.sh"
 
-enable_service docker.service
+pkg::enable_service docker.service
 
 if id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
-    info "$USER is already in the docker group"
+    log::info "$USER is already in the docker group"
 else
-    info "Adding $USER to the docker group"
+    log::info "Adding $USER to the docker group"
     sudo usermod -aG docker "$USER"
-    warn "Log out and back in for the docker group to take effect"
+    log::warn "Log out and back in for the docker group to take effect"
 fi
