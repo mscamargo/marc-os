@@ -10,7 +10,9 @@ symlink dotfiles. No package manager, no tests, no CI.
 | `install.sh` | Entry point. Sources `lib/common.sh`, runs `scripts/*.sh` in glob order. |
 | `scripts/NN-*.sh` | Numbered setup steps. Must be `chmod +x` or `install.sh` skips them. |
 | `lib/common.sh` | Shared helpers: `info`, `warn`, `die`, `pacman_install`, `link_dotfile`. |
-| `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `scripts/07-dotfiles.sh`. |
+| `packages.csv` | LARBS-style package manifest consumed by `scripts/03-packages.sh`. |
+| `hooks/` | Optional pre/post-install scripts referenced from `packages.csv`. |
+| `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `scripts/04-dotfiles.sh`. |
 | `config/bin/` | Custom executable scripts. Linked into `$HOME/.local/bin/`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
 
@@ -19,14 +21,36 @@ symlink dotfiles. No package manager, no tests, no CI.
 | # | Script | Purpose |
 |---|--------|---------|
 | 00 | `00-check.sh`     | Pre-flight: Arch, non-root, pacman, git, internet. |
-| 01 | `01-base.sh`      | `pacman -Syu` and base xorg packages. |
+| 01 | `01-base.sh`      | `pacman -Syu` and AUR-helper prerequisites (`base-devel`, `git`). |
 | 02 | `02-aur-helper.sh`| Bootstrap `yay`. |
-| 03 | `03-packages.sh`  | Core CLI/audio/fonts: zsh + plugins, neovim, pipewire, brightnessctl, fonts. |
-| 04 | `04-wm.sh`        | i3 stack: i3-wm, i3status, i3lock, xss-lock, dunst, picom, rofi, polkit-gnome, autorandr, arandr. |
-| 05 | `05-apps.sh`      | Apps: alacritty, browsers (qutebrowser/firefox/chromium + google-chrome via yay), yazi/lf/ranger, maim/slop/xclip/xdotool, clipmenu, playerctl, xdg utils. |
-| 06 | `06-system.sh`    | NetworkManager + bluez, enabled via `systemctl`. |
-| 07 | `07-dotfiles.sh`  | Symlink `config/` into `$HOME` and `$HOME/.config/`. |
-| 08 | `08-shell.sh`     | `chsh -s zsh`. |
+| 03 | `03-packages.sh`  | Iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
+| 04 | `04-dotfiles.sh`  | Symlink `config/` into `$HOME` and `$HOME/.config/`. |
+| 05 | `05-shell.sh`     | `chsh -s zsh`. |
+
+## packages.csv format
+
+Five columns, no header row, comma-separated, unquoted. **Fields must not
+contain commas.** Lines starting with `#` are comments and blanks are
+skipped.
+
+    tag,name,description,pre-install-script,post-install-script
+
+| Tag | Meaning | `name` field |
+|-----|---------|--------------|
+| (blank) | pacman | package name |
+| `A` | AUR via `yay` | package name |
+| `G` | `git clone` to `~/.local/src/<repo>` | clone URL |
+
+Hook columns are paths relative to repo root (e.g. `hooks/enable-bluetooth.sh`).
+Empty cell = no hook. Hooks run as `bash "$REPO_ROOT/<path>"` with these env
+vars exported: `PKG_NAME`, `PKG_TAG`, `PKG_DESC`; for `G` rows, `SRC_DIR` is
+also set to the clone target. Hooks should source `lib/common.sh` for shared
+helpers.
+
+The runner skips rows whose package is already installed (`pacman -Qq`) or
+whose `SRC_DIR` already exists. Row failures are collected and reported in a
+final summary; the run continues after each failure and exits non-zero if any
+row failed.
 
 ## Critical workflow details
 
