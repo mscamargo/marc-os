@@ -15,9 +15,9 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
   don't re-prompt
 - Symlinks every file under `dotfiles/` into `$HOME` (per-leaf), auto-migrating
   any legacy dir-symlinks, and prunes stale links pointing into the repo
-- Sets zsh as the default shell (and, with `--clean-bash`, removes legacy
-  `~/.bash{rc,_profile,_logout}` so they don't shadow zsh)
-- Logs each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
+- Sets zsh as the default shell and removes legacy
+  `~/.bash{rc,_profile,_logout}` so they don't shadow zsh
+- Logs each `install.sh` run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 
 ## Requirements
 
@@ -27,21 +27,19 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 
 ## Usage
 
-    ./install.sh                       # default run, in order
-    ./install.sh --only configure      # only re-link dotfiles + set shell
-    ./install.sh --only doctor         # read-only drift report (exits 1 on drift)
-    ./install.sh --skip check          # skip the pre-flight check
-    ./install.sh --clean-bash          # also rm ~/.bash{rc,_profile,_logout}
-    ./install.sh -h                    # usage
+Three top-level scripts, no flags:
 
-Default stages (run in this order): `check`, `bootstrap`, `install`,
-`configure`. The `doctor` stage is opt-in via `--only doctor`. `--only` and
-`--skip` take a comma-separated list of stage names. They can be combined;
-`--skip` wins on conflicts. No dependency validation — if you `--only
-configure` on a bare system, you'll see the underlying errors.
+    ./install.sh        # new-machine setup, end-to-end
+    ./configure.sh      # re-link dotfiles only (the frequent loop)
+    ./doctor.sh         # read-only drift report; exits 1 on drift
 
-Each run is tee'd to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
+`install.sh` runs `check` → `bootstrap` → `install` → `setup_shell` →
+`configure_dotfiles` in order. All three scripts are idempotent: every
+helper self-skips work that's already done.
+
+`install.sh` tees its output to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 (defaults to `~/.local/state/marc-os/`). No rotation; clean up manually.
+`configure.sh` and `doctor.sh` print to the terminal only.
 
 After installation, restart your shell or run `exec zsh -l`. Log in on a
 TTY and run `startx` to launch i3.
@@ -86,7 +84,7 @@ file by file. Examples:
 | `dotfiles/.local/bin/screenshot-full` | `~/.local/bin/screenshot-full` |
 
 Adding a new dotfile: drop the file at its mirrored path under `dotfiles/`
-and re-run `./install.sh --only configure`. No script edit.
+and re-run `./configure.sh`. No script edit.
 
 Leaf-level linking means target directories are real, so files an app writes
 into `~/.config/<x>/` (plugin lockfiles, sessions, history, …) stay in the
@@ -94,16 +92,18 @@ target tree and never dirty the repo. The first run after upgrading from the
 old dir-symlink layout transparently replaces ancestor dir-symlinks with
 real directories.
 
-`configure` also prunes any symlink that resolves into the repo but whose
-target file is gone — so deleting a file from `dotfiles/` is enough; the next
-run cleans up the orphan link.
+`configure_dotfiles` also prunes any symlink that resolves into the repo but
+whose target file is gone — so deleting a file from `dotfiles/` is enough; the
+next `./configure.sh` run cleans up the orphan link.
 
 ## Structure
 
-- `install.sh` — entry point. All stage logic lives here as functions.
+- `install.sh` — new-machine setup entry point.
+- `configure.sh` — dotfile re-link entry point.
+- `doctor.sh` — drift report entry point.
 - `functions.sh` — shared helpers (`info`, `die`, `pacman_install`,
-  `enable_service`, `link_dotfile`, `prune_stale_links_in`, …) sourced by
-  `install.sh` and each hook.
+  `enable_service`, `link_dotfile`, `prune_stale_links_in`, `parse_row`,
+  `configure_dotfiles`, …) sourced by all three scripts and each hook.
 - `packages.csv` — package manifest.
 - `hooks/` — per-package install hooks, discovered by filename convention
   (`<package>.pre.sh`, `<package>.post.sh`).

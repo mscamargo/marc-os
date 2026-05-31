@@ -7,47 +7,47 @@ symlink dotfiles. No package manager, no tests, no CI.
 
 | Path | Purpose |
 |------|---------|
-| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip`/`--clean-bash` flags. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. |
-| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `enable_service`, `link_dotfile`, `migrate_ancestor_symlinks`, `prune_stale_links_in`. Sourced by `install.sh` and each hook. |
-| `packages.csv` | LARBS-style package manifest consumed by `stage_install`. |
+| `install.sh` | New-machine setup entry point. `main` runs `check` → `bootstrap` → `install_packages` → `setup_shell` → `configure_dotfiles` end-to-end. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. Only flag is `-h`/`--help`. |
+| `configure.sh` | Re-link dotfiles only. `assert_non_root` + `configure_dotfiles`. No flags, no log file. |
+| `doctor.sh` | Read-only drift report. `assert_non_root` + walk `packages.csv` and `dotfiles/`, exit non-zero on drift. No flags, no log file. |
+| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `assert_non_root`, `pacman_install`, `enable_service`, `link_dotfile`, `migrate_ancestor_symlinks`, `prune_stale_links_in`, `parse_row`, `configure_dotfiles`. Sourced by the three entry-point scripts and each hook. |
+| `packages.csv` | LARBS-style package manifest consumed by `install_packages` and `doctor.sh`. |
 | `hooks/` | Optional pre/post-install scripts. Discovered by filename: `hooks/<package>.pre.sh` and `hooks/<package>.post.sh`. |
-| `dotfiles/` | Mirrors `$HOME`. Every file is leaf-symlinked into place by `stage_configure`. |
+| `dotfiles/` | Mirrors `$HOME`. Every file is leaf-symlinked into place by `configure_dotfiles`. |
 | `check.sh` | Ad-hoc `shellcheck` runner over all `*.sh`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
 
-## Stages
+## Entry points
 
-`install.sh` defines `STAGES=(check bootstrap install configure doctor)` for
-validation and `DEFAULT_STAGES=(check bootstrap install configure)` for the
-default loop. Each is a function named `stage_<name>`. `doctor` is opt-in
-(only runs when listed in `--only`).
+Three single-purpose scripts. No flag dispatcher, no `--only`/`--skip`.
+Idempotency holds across all of them: every helper self-skips work that's
+already done, so re-running is safe.
 
-| Stage | Purpose |
-|-------|---------|
+| Script | Steps | Pre-flight |
+|--------|-------|-----------|
+| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `configure_dotfiles` | Arch + non-root + pacman/git + internet |
+| `configure.sh` | `configure_dotfiles` | non-root |
+| `doctor.sh` | walk `packages.csv` + `dotfiles/`; report missing pkgs, wrong/missing/shadowed links, orphan in-repo links | non-root |
+
+### `install.sh` step breakdown
+
+| Step | Purpose |
+|------|---------|
 | `check`     | Pre-flight: Arch, non-root, pacman, git, internet. |
 | `bootstrap` | `tune_pacman_conf` (Color, ILoveCandy, ParallelDownloads, VerbosePkgLists, `[multilib]`), `refresh_keyring` (`pacman -S archlinux-keyring`), `pacman -Syu`, install `base-devel` + `git`, bootstrap `yay`. |
-| `install`   | Start a background `sudo -v` keep-alive (trapped on EXIT), iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
-| `configure` | Leaf-symlink every file under `dotfiles/` into the mirrored path in `$HOME`, prune stale symlinks resolving into the repo, `chsh -s zsh`, and (when `--clean-bash`) `rm` `~/.bash{rc,_profile,_logout}`. |
-| `doctor`    | Read-only drift report: missing pacman/AUR/G packages, dotfiles whose link is wrong/missing/shadowed, orphan in-repo links. Exits non-zero on drift. |
+| `install_packages` | Start a background `sudo -v` keep-alive (trapped on EXIT), iterate `packages.csv`: install pacman/AUR/git rows, run per-row hooks. |
+| `setup_shell` | `chsh -s zsh` if not already default. |
+| `configure_dotfiles` | Shared with `configure.sh`. Leaf-symlink every file under `dotfiles/` into `$HOME`, prune stale symlinks resolving into the repo, unconditionally `rm` `~/.bash{rc,_profile,_logout}` (skipping symlinks). |
 
-### CLI flags
-
-- `--only STAGE[,STAGE...]` — allow-list. Validated against `STAGES`. Only mechanism that lets `doctor` run.
-- `--skip STAGE[,STAGE...]` — deny-list (wins over `--only`).
-- `--clean-bash` — exported as `CLEAN_BASH=1`; in `configure`, `rm` `~/.bash{rc,_profile,_logout}`.
-- `-h` / `--help` — usage.
-
-Unknown flags and unknown stage names exit non-zero. Dependencies between
-stages are **not** validated; running `--only configure` on a bare system will
-fail with the underlying error.
+`-h` / `--help` prints usage. Any other flag exits non-zero.
 
 ### Logging
 
-`main` opens `$XDG_STATE_HOME/marc-os/install-<timestamp>.log` and `tee`s
-stdout and stderr to it via `exec > >(tee -a ...) 2> >(tee -a ... >&2)`.
+`install.sh` opens `$XDG_STATE_HOME/marc-os/install-<timestamp>.log` and
+`tee`s stdout and stderr to it via `exec > >(tee -a ...) 2> >(tee -a ... >&2)`.
 ANSI codes are preserved in the log; read with `less -R`. No rotation. The
 last 1–2 lines may not flush on `set -e` crashes (process-substitution
-limitation).
+limitation). `configure.sh` and `doctor.sh` do not log.
 
 ## packages.csv format
 
@@ -84,33 +84,34 @@ a unit" pattern, use `enable_service <unit>` from `functions.sh`; it is
 idempotent.
 
 Row failures (install or hook) are collected and reported in a final summary;
-the run continues after each failure and the stage exits non-zero if any row
-failed. Other stages are fail-fast.
+`install_packages` continues after each failure and exits non-zero if any row
+failed. The other steps are fail-fast.
 
 Known limitation: package names containing `.` would make the suffix
 ambiguous. No current package has one.
 
 ## Critical workflow details
 
-### Install script behavior
-- Runs only on Arch Linux, as a regular user (not root). Uses `sudo` internally.
-- `install.sh` sets `set -euo pipefail`; `functions.sh` does not (it is a sourced library).
-- All stages are idempotent: re-running is safe. `tune_pacman_conf` and `enable_service` self-skip when the change is already in place; `link_dotfile` no-ops when the link is correct.
-- `stage_install` keeps the sudo timestamp warm via a background `while true; do sudo -n true; sleep 60; done` started by `start_sudo_keepalive` and killed by `stop_sudo_keepalive` (also wired to an `EXIT` trap so a crash mid-install doesn't leak the loop).
+### Script behavior
+- All three entry points run only as a regular user (not root); `install.sh` additionally requires Arch Linux and internet. Uses `sudo` internally where needed.
+- Entry-point scripts set `set -euo pipefail`; `functions.sh` does not (it is a sourced library).
+- Re-running is safe: `tune_pacman_conf` and `enable_service` self-skip when the change is already in place; `link_dotfile` no-ops when the link is correct; `setup_shell` self-skips when `$SHELL` already matches `command -v zsh`; the bash cleanup skips symlinks and absent files.
+- `install_packages` keeps the sudo timestamp warm via a background `while true; do sudo -n true; sleep 60; done` started by `start_sudo_keepalive` and killed by `stop_sudo_keepalive` (also wired to an `EXIT` trap so a crash mid-install doesn't leak the loop).
 
 ### Dotfile linking
-- `stage_configure` runs `find dotfiles -type f` and translates each repo path `dotfiles/X` to target `$HOME/X`. The set of dotfiles is implicit in the directory tree; there is no list to edit.
+- `configure_dotfiles` (in `functions.sh`, called by both `install.sh` and `configure.sh`) runs `find dotfiles -type f` and translates each repo path `dotfiles/X` to target `$HOME/X`. The set of dotfiles is implicit in the directory tree; there is no list to edit.
 - `link_dotfile` calls `migrate_ancestor_symlinks` first to replace any ancestor of the target that is a symlink resolving into `$REPO_ROOT` with a real directory (one-shot migration from the legacy dir-symlink layout). Then it `ln -sfn`s the leaf.
 - If a real file (not symlink) already exists at the destination, it is backed up to `$dest.backup.<timestamp>`.
 - After linking, `prune_stale_links_in` scans `$HOME` at depth 1 (catches stale top-level dotfiles) and each `$HOME/<name>/` whose `dotfiles/<name>/` is a directory (catches stale leaves). A link is pruned iff its `readlink -f` resolves into `$REPO_ROOT` and the target file is gone.
+- `configure_dotfiles` finishes by `rm`-ing `~/.bash{rc,_profile,_logout}` if present (symlinks skipped) so they don't shadow zsh's init files.
 
 ### i3 launch flow
 - TTY login → `startx` → `~/.xinitrc` (`exec i3`).
 - i3 spawns daemons (`picom`, `dunst`, `clipmenud`, `polkit-gnome` agent, `xss-lock -- i3lock`) via `exec`, and re-applies `xsetroot` and `xset s 300` via `exec_always`.
 
 ### Adding helpers
-- Put reusable helpers in `functions.sh` so both `install.sh` and hooks see them.
-- Stage-local helpers live in `install.sh` next to the stage function that calls them (e.g. `install_row` next to `stage_install`).
+- Put reusable helpers in `functions.sh` so all three entry-point scripts and the hooks see them. `parse_row` and `configure_dotfiles` live there for exactly this reason.
+- Script-local helpers live in `install.sh` next to the function that calls them (e.g. `install_row` next to `install_packages`).
 
 ## VM testing
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Shared helpers for install.sh and per-package hooks.
-# Sourced; does not set -e itself (callers do).
+# Shared helpers for install.sh, configure.sh, doctor.sh, and per-package
+# hooks. Sourced; does not set -e itself (callers do).
 
 readonly C_RESET='\033[0m'
 readonly C_RED='\033[0;31m'
@@ -33,6 +33,10 @@ die() {
 
 check_command() {
     command -v "$1" &>/dev/null
+}
+
+assert_non_root() {
+    [[ "$EUID" -ne 0 ]] || die "Do not run this script as root. It will use sudo when needed."
 }
 
 pacman_install() {
@@ -117,3 +121,66 @@ prune_stale_links_in() {
     done < <(find "${find_args[@]}" 2>/dev/null)
 }
 
+# Strip surrounding double quotes from $1 (LARBS-style desc).
+unquote() {
+    local s="$1"
+    s="${s#\"}"
+    s="${s%\"}"
+    printf '%s' "$s"
+}
+
+# Parse "tag,name,desc" with optional "..."-wrapped desc that may contain commas.
+# Sets PARSED_TAG, PARSED_NAME, PARSED_DESC for the caller.
+# shellcheck disable=SC2034  # PARSED_* are read by install.sh / doctor.sh
+parse_row() {
+    local row="$1"
+    PARSED_TAG=""; PARSED_NAME=""; PARSED_DESC=""
+    IFS=',' read -r PARSED_TAG PARSED_NAME PARSED_DESC <<< "$row"
+    if [[ "$PARSED_DESC" == \"* && "$PARSED_DESC" != *\" ]]; then
+        # Quoted desc with embedded commas: re-extract tail from second comma.
+        PARSED_DESC="${row#*,*,}"
+    fi
+    PARSED_DESC="$(unquote "$PARSED_DESC")"
+}
+
+# Mirror every file under $REPO_ROOT/dotfiles into $HOME via leaf symlinks,
+# prune stale in-repo links, and remove legacy bash init files. Idempotent.
+configure_dotfiles() {
+    local src_root="$REPO_ROOT/dotfiles"
+    [[ -d "$src_root" ]] || die "dotfiles/ not found at $src_root"
+
+    info "Linking dotfiles from $src_root into \$HOME"
+
+    local file rel dest
+    while IFS= read -r -d '' file; do
+        rel="${file#"$src_root"/}"
+        dest="$HOME/$rel"
+        link_dotfile "$file" "$dest"
+    done < <(find "$src_root" -type f -print0)
+
+    info "Pruning stale symlinks"
+    prune_stale_links_in "$HOME" 1
+    local entry name target
+    for entry in "$src_root"/* "$src_root"/.*; do
+        name="$(basename "$entry")"
+        [[ "$name" == "." || "$name" == ".." ]] && continue
+        [[ -d "$entry" ]] || continue
+        target="$HOME/$name"
+        [[ -d "$target" ]] || continue
+        prune_stale_links_in "$target"
+    done
+
+    success "Dotfiles configured"
+
+    info "Removing legacy bash init files"
+    local f
+    for f in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.bash_logout"; do
+        if [[ -L "$f" ]]; then
+            info "  Skipping symlink: $f"
+            continue
+        fi
+        [[ -e "$f" ]] || continue
+        info "  Removing: $f"
+        rm -f -- "$f"
+    done
+}
