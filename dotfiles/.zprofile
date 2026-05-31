@@ -1,4 +1,1 @@
-# Auto-start X on TTY1
-if [[ -z "$DISPLAY" ]] && [[ "$(tty)" == /dev/tty1 ]]; then
-    # exec startx
-fi
+# Log in on a TTY and run `startx` manually to launch i3.

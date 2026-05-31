@@ -51,8 +51,9 @@ limitation). `configure.sh` and `doctor.sh` do not log.
 
 ## packages.csv format
 
-Three columns, comma-separated, with a header row on line 1. Blank lines are
-skipped.
+Three columns, comma-separated, with a header row on line 1. Blank lines and
+lines beginning with `#` (after optional leading whitespace) are skipped by
+both `install_packages` and `doctor.sh`.
 
     tag,name,description
 
@@ -65,6 +66,10 @@ skipped.
 `tag` and `name` must not contain commas. `description` may contain commas
 if the field is wrapped in `"..."` (LARBS-style). `parse_row` handles both
 the unquoted and `"..."`-quoted forms; the surrounding quotes are stripped.
+
+Package names containing `.` make the hook-suffix derivation ambiguous
+(`hooks/<name>.{pre,post}.sh`) and are unsupported. The CSV header carries
+the same warning inline.
 
 ## Hooks
 
@@ -88,7 +93,15 @@ Row failures (install or hook) are collected and reported in a final summary;
 failed. The other steps are fail-fast.
 
 Known limitation: package names containing `.` would make the suffix
-ambiguous. No current package has one.
+ambiguous. No current package has one — and the CSV header now flags this
+explicitly.
+
+Current hooks: `hooks/networkmanager.post.sh`, `hooks/bluez.post.sh`,
+`hooks/docker.post.sh` (enable `docker.service`, add `$USER` to `docker`
+group, warn about re-login), `hooks/openssh.post.sh` (idempotent
+`ssh-keygen -t ed25519`, enable user `ssh-agent.service`, echo pubkey),
+`hooks/mise.post.sh` (`mise install` from `~/.config/mise/config.toml`,
+then `corepack enable`).
 
 ## Critical workflow details
 

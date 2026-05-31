@@ -8,9 +8,13 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
   `VerbosePkgLists`, enables `[multilib]`), refreshes `archlinux-keyring`,
   runs `pacman -Syu`, and bootstraps the `yay` AUR helper
 - Installs every package listed in `packages.csv` (Xorg, audio, fonts, zsh,
-  neovim, i3 stack, apps, browsers, NetworkManager, bluez, …) and runs any
-  matching `hooks/<package>.{pre,post}.sh` scripts (e.g. enabling
-  `NetworkManager.service` and `bluetooth.service`)
+  neovim, i3 stack, apps, browsers, NetworkManager, bluez, plus a dev stack:
+  `mise`, `docker`, `openssh`, `fzf`/`ripgrep`/`fd`/`bat`/`eza`/`jq`/`yq`,
+  `github-cli`/`git-delta`/`lazygit`, `tmux`/`btop`, `httpie`/`bind`/`nmap`,
+  `python-pipx`/`uv`, `shellcheck`, …) and runs any matching
+  `hooks/<package>.{pre,post}.sh` scripts (e.g. enabling
+  `NetworkManager.service` / `bluetooth.service` / `docker.service`,
+  generating an ed25519 SSH key, materializing `mise` runtimes)
 - Keeps the sudo timestamp warm during the install loop so long AUR builds
   don't re-prompt
 - Symlinks every file under `dotfiles/` into `$HOME` (per-leaf), auto-migrating
@@ -44,6 +48,13 @@ helper self-skips work that's already done.
 After installation, restart your shell or run `exec zsh -l`. Log in on a
 TTY and run `startx` to launch i3.
 
+The `docker` group is added during install; **log out and back in** before
+running `docker` as your user. The `openssh` hook generates `~/.ssh/id_ed25519`
+on first run (skipped if it already exists) and prints the public key to the
+log so you can paste it into GitHub. `mise` materializes the runtimes pinned
+in `~/.config/mise/config.toml` (Node LTS, Python, Go, Ruby) and enables
+`corepack`. Zsh history lives under `$XDG_STATE_HOME/zsh/history`.
+
 ## Adding a package
 
 Edit `packages.csv`. Three columns, comma-separated, with a header row:
@@ -58,7 +69,9 @@ Edit `packages.csv`. Three columns, comma-separated, with a header row:
 
 `tag` and `name` must not contain commas. `description` may contain commas
 if the field is wrapped in `"..."` (LARBS-style). The runner skips the
-header row and blank lines.
+header row, blank lines, and any line beginning with `#`. Hook discovery
+keys off `name` (or the repo basename for `G` rows), so package names
+containing `.` would make the suffix ambiguous — avoid them.
 
 ## Hooks
 
@@ -81,6 +94,9 @@ file by file. Examples:
 |-----------|--------|
 | `dotfiles/.zshrc` | `~/.zshrc` |
 | `dotfiles/.config/nvim/init.lua` | `~/.config/nvim/init.lua` |
+| `dotfiles/.config/mise/config.toml` | `~/.config/mise/config.toml` |
+| `dotfiles/.config/tmux/tmux.conf` | `~/.config/tmux/tmux.conf` |
+| `dotfiles/.ssh/config` | `~/.ssh/config` |
 | `dotfiles/.local/bin/screenshot-full` | `~/.local/bin/screenshot-full` |
 
 Adding a new dotfile: drop the file at its mirrored path under `dotfiles/`
