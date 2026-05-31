@@ -19,8 +19,6 @@ pacman_install \
     noto-fonts-emoji \
     ttf-hack \
     ttf-jetbrains-mono \
-    picom \
-    feh \
     zsh-completions \
     zsh-syntax-highlighting \
     zsh-autosuggestions

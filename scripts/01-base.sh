@@ -14,11 +14,6 @@ pacman_install \
     xorg-server \
     xorg-xinit \
     xorg-xrandr \
-    xorg-xsetroot \
-    libx11 \
-    libxinerama \
-    libxft \
-    fontconfig \
-    freetype2
+    xorg-xsetroot
 
 success "Base packages installed"
