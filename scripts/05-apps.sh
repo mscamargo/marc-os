@@ -17,6 +17,7 @@ pacman_install \
     maim \
     slop \
     xclip \
+    xdotool \
     clipmenu \
     playerctl \
     xdg-utils \
