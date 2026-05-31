@@ -18,7 +18,7 @@ usage() {
 Usage: $(basename "$0") [-h|--help]
 
 End-to-end new-machine setup, run in order:
-  check       Pre-flight: Arch Linux, non-root, pacman/git, internet
+  check       Pre-flight: Arch Linux, non-root, pacman, internet
   bootstrap   Patch /etc/pacman.conf (Color, ILoveCandy, ParallelDownloads,
               VerbosePkgLists, multilib), refresh archlinux-keyring,
               pacman -Syu, install base-devel + git, bootstrap yay
@@ -43,7 +43,6 @@ check() {
     [[ -f /etc/arch-release ]] || log::die "This script is intended for Arch Linux only."
     log::assert_non_root
     util::has_command pacman || log::die "pacman not found. Is this Arch Linux?"
-    util::has_command git || log::die "git is required but not installed. Install it first: sudo pacman -S git"
     ping -c 1 -W 2 archlinux.org &> /dev/null || log::die "No internet connection detected."
 
     log::success "Pre-flight checks passed"

@@ -32,7 +32,7 @@ already done, so re-running is safe.
 
 | Script | Steps | Pre-flight |
 |--------|-------|-----------|
-| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `dot::configure` | Arch + non-root + pacman/git + internet |
+| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `dot::configure` | Arch + non-root + pacman + internet |
 | `configure.sh` | `dot::configure` | non-root |
 | `doctor.sh` | walk `data/*.list` + `dotfiles/`; report missing pkgs, wrong/missing/shadowed links, orphan in-repo links | non-root |
 
@@ -40,7 +40,7 @@ already done, so re-running is safe.
 
 | Step | Purpose |
 |------|---------|
-| `check`            | Pre-flight: Arch, non-root, pacman, git, internet. |
+| `check`            | Pre-flight: Arch, non-root, pacman, internet. |
 | `bootstrap`        | `pkg::tune_pacman_conf /etc/pacman.conf` (Color, ILoveCandy, ParallelDownloads, VerbosePkgLists, `[multilib]`), `pkg::refresh_keyring`, `pacman -Syu`, `pkg::install_pacman base-devel git`, `pkg::bootstrap_aur_helper`. |
 | `install_packages` | `sudo::keepalive_start`, then `pkg::install_list` for `data/pacman.list`, `data/aur.list`, `data/git_src.list` (each runs per-row hooks); `sudo::keepalive_stop`. |
 | `setup_shell`      | `chsh -s zsh` if not already default. |
