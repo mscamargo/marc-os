@@ -4,16 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
-info "Updating system and installing base packages"
-
+info "Updating system"
 sudo pacman -Syu --noconfirm
 
-pacman_install \
-    base-devel \
-    git \
-    xorg-server \
-    xorg-xinit \
-    xorg-xrandr \
-    xorg-xsetroot
+info "Installing AUR helper prerequisites"
+pacman_install base-devel git
 
-success "Base packages installed"
+success "Base prerequisites installed"
