@@ -1,43 +1,26 @@
 #!/usr/bin/env bash
 # Shared helpers for install.sh, configure.sh, doctor.sh, and per-package
 # hooks. Sourced; does not set -e itself (callers do).
-
-readonly C_RESET='\033[0m'
-readonly C_RED='\033[0;31m'
-readonly C_GREEN='\033[0;32m'
-readonly C_YELLOW='\033[0;33m'
-readonly C_BLUE='\033[0;34m'
+#
+# Transitional shim: the canonical implementations now live in lib/*.sh.
+# This file keeps the old un-namespaced names alive while callers migrate.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-info() {
-    printf "${C_BLUE}==>${C_RESET} %s\n" "$1"
-}
+# shellcheck source=lib/log.sh
+source "$REPO_ROOT/lib/log.sh"
+# shellcheck source=lib/util.sh
+source "$REPO_ROOT/lib/util.sh"
+# shellcheck source=lib/sudo.sh
+source "$REPO_ROOT/lib/sudo.sh"
 
-warn() {
-    printf "${C_YELLOW}WARN:${C_RESET} %s\n" "$1"
-}
-
-error() {
-    printf "${C_RED}ERROR:${C_RESET} %s\n" "$1" >&2
-}
-
-success() {
-    printf "${C_GREEN}==>${C_RESET} %s\n" "$1"
-}
-
-die() {
-    error "$1"
-    exit 1
-}
-
-check_command() {
-    command -v "$1" &>/dev/null
-}
-
-assert_non_root() {
-    [[ "$EUID" -ne 0 ]] || die "Do not run this script as root. It will use sudo when needed."
-}
+info()             { log::info "$1"; }
+warn()             { log::warn "$1"; }
+error()            { log::error "$1"; }
+success()          { log::success "$1"; }
+die()              { log::die "$1"; }
+assert_non_root()  { log::assert_non_root; }
+check_command()    { util::has_command "$1"; }
 
 pacman_install() {
     info "Installing: $*"
