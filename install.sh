@@ -22,7 +22,7 @@ End-to-end new-machine setup, run in order:
   bootstrap   Patch /etc/pacman.conf (Color, ILoveCandy, ParallelDownloads,
               VerbosePkgLists, multilib), refresh archlinux-keyring,
               pacman -Syu, install base-devel + git, bootstrap yay
-  install     Install every row in packages.csv; run per-row hooks
+  install     Install every row in data/{pacman,aur,git_src}.list; run hooks
   shell       chsh -s zsh
   configure   Leaf-symlink dotfiles/ into \$HOME, prune stale links,
               remove legacy ~/.bash{rc,_profile,_logout}
@@ -66,82 +66,20 @@ bootstrap() {
 
 # ---------- install ----------
 
-install_row() {
-    local tag="$1" name="$2" desc="$3" i="$4" total="$5"
-
-    unset SRC_DIR
-    export PKG_NAME="$name" PKG_TAG="$tag" PKG_DESC="$desc"
-
-    local key already=0
-    case "$tag" in
-        "" | A)
-            key="$name"
-            pkg::is_installed_pacman "$name" && already=1
-            ;;
-        G)
-            key="$(basename "$name" .git)"
-            export SRC_DIR="$PKG_SRC_ROOT/$key"
-            pkg::is_installed_git_src "$key" && already=1
-            ;;
-        *)
-            log::error "[$i/$total] unknown tag '$tag' for $name"
-            return 1
-            ;;
-    esac
-
-    if ((already)); then
-        log::info "[$i/$total] $name: already installed"
-    else
-        log::info "[$i/$total] Installing $name: $desc"
-    fi
-
-    local hooks_dir="$SCRIPT_DIR/hooks"
-    pkg::run_pre_hook "$key" "$hooks_dir" || return 1
-
-    if ((!already)); then
-        case "$tag" in
-            "") pkg::install_pacman "$name" || return 1 ;;
-            A) pkg::install_aur "$name" || return 1 ;;
-            G) pkg::install_git_src "$name" "$PKG_SRC_ROOT" || return 1 ;;
-        esac
-    fi
-
-    pkg::run_post_hook "$key" "$hooks_dir" || return 1
-}
-
 install_packages() {
-    local csv="$SCRIPT_DIR/packages.csv"
-    [[ -f "$csv" ]] || log::die "packages.csv not found at $csv"
-
-    mapfile -t rows < <(tail -n +2 "$csv" | grep -Ev '^\s*(#|$)')
-    local total=${#rows[@]}
-    ((total > 0)) || log::die "no package rows found in $csv"
-
-    log::info "Installing $total packages from packages.csv"
+    local hooks_dir="$SCRIPT_DIR/hooks"
+    local data="$SCRIPT_DIR/data"
 
     sudo::keepalive_start
 
-    local failed=() i=0 row tag name desc
-    for row in "${rows[@]}"; do
-        i=$((i + 1))
-        IFS=',' read -r tag name desc <<< "$row"
-        if ! install_row "$tag" "$name" "$desc" "$i" "$total"; then
-            failed+=("$name")
-        fi
-    done
+    local rc=0
+    pkg::install_list "$data/pacman.list"  pacman "$hooks_dir" || rc=1
+    pkg::install_list "$data/aur.list"     aur    "$hooks_dir" || rc=1
+    pkg::install_list "$data/git_src.list" git    "$hooks_dir" || rc=1
 
     sudo::keepalive_stop
 
-    if ((${#failed[@]} > 0)); then
-        log::error "Failed rows (${#failed[@]}/${total}):"
-        local f
-        for f in "${failed[@]}"; do
-            printf "  - %s\n" "$f" >&2
-        done
-        return 1
-    fi
-
-    log::success "All $total packages installed"
+    return "$rc"
 }
 
 # ---------- shell ----------
