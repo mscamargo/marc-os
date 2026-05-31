@@ -31,17 +31,14 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
     ./install.sh --only configure      # only re-link dotfiles + set shell
     ./install.sh --only doctor         # read-only drift report (exits 1 on drift)
     ./install.sh --skip check          # skip the pre-flight check
-    ./install.sh --dry-run             # print planned actions, do nothing
     ./install.sh --clean-bash          # also rm ~/.bash{rc,_profile,_logout}
     ./install.sh -h                    # usage
 
 Default stages (run in this order): `check`, `bootstrap`, `install`,
 `configure`. The `doctor` stage is opt-in via `--only doctor`. `--only` and
 `--skip` take a comma-separated list of stage names. They can be combined;
-`--skip` wins on conflicts. `--dry-run` propagates to link, prune, backup,
-chsh, pacman.conf, and bash-cleanup ops (package installs themselves still
-run). No dependency validation — if you `--only configure` on a bare system,
-you'll see the underlying errors.
+`--skip` wins on conflicts. No dependency validation — if you `--only
+configure` on a bare system, you'll see the underlying errors.
 
 Each run is tee'd to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 (defaults to `~/.local/state/marc-os/`). No rotation; clean up manually.

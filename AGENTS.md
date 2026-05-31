@@ -7,7 +7,7 @@ symlink dotfiles. No package manager, no tests, no CI.
 
 | Path | Purpose |
 |------|---------|
-| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip`/`--dry-run`/`--clean-bash` flags. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. |
+| `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip`/`--clean-bash` flags. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. |
 | `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `enable_service`, `link_dotfile`, `migrate_ancestor_symlinks`, `prune_stale_links_in`. Sourced by `install.sh` and each hook. |
 | `packages.csv` | LARBS-style package manifest consumed by `stage_install`. |
 | `hooks/` | Optional pre/post-install scripts. Discovered by filename: `hooks/<package>.pre.sh` and `hooks/<package>.post.sh`. |
@@ -34,8 +34,7 @@ default loop. Each is a function named `stage_<name>`. `doctor` is opt-in
 
 - `--only STAGE[,STAGE...]` — allow-list. Validated against `STAGES`. Only mechanism that lets `doctor` run.
 - `--skip STAGE[,STAGE...]` — deny-list (wins over `--only`).
-- `--dry-run` — exported as `DRY_RUN=1`; `tune_pacman_conf`, `link_dotfile`, `prune_stale_links_in`, `migrate_ancestor_symlinks`, `enable_service`, the `chsh` step, and the `--clean-bash` removals print intended ops instead of executing. Package installs and `pacman -Syu` still run.
-- `--clean-bash` — exported as `CLEAN_BASH=1`; in `configure`, `rm` `~/.bash{rc,_profile,_logout}` (honors `DRY_RUN`).
+- `--clean-bash` — exported as `CLEAN_BASH=1`; in `configure`, `rm` `~/.bash{rc,_profile,_logout}`.
 - `-h` / `--help` — usage.
 
 Unknown flags and unknown stage names exit non-zero. Dependencies between
@@ -82,7 +81,7 @@ therefore be idempotent. Hooks run as `bash <path>` with `PKG_NAME`,
 `PKG_TAG`, `PKG_DESC` exported (and `SRC_DIR` for `G` rows). Hooks should
 `source ../functions.sh` for shared helpers. For the common "enable + start
 a unit" pattern, use `enable_service <unit>` from `functions.sh`; it is
-idempotent and honors `DRY_RUN`.
+idempotent.
 
 Row failures (install or hook) are collected and reported in a final summary;
 the run continues after each failure and the stage exits non-zero if any row
@@ -104,7 +103,6 @@ ambiguous. No current package has one.
 - `link_dotfile` calls `migrate_ancestor_symlinks` first to replace any ancestor of the target that is a symlink resolving into `$REPO_ROOT` with a real directory (one-shot migration from the legacy dir-symlink layout). Then it `ln -sfn`s the leaf.
 - If a real file (not symlink) already exists at the destination, it is backed up to `$dest.backup.<timestamp>`.
 - After linking, `prune_stale_links_in` scans `$HOME` at depth 1 (catches stale top-level dotfiles) and each `$HOME/<name>/` whose `dotfiles/<name>/` is a directory (catches stale leaves). A link is pruned iff its `readlink -f` resolves into `$REPO_ROOT` and the target file is gone.
-- All of `link_dotfile`, `migrate_ancestor_symlinks`, and `prune_stale_links_in` honor `DRY_RUN=1`: they `info` the intended op and return without touching the filesystem.
 
 ### i3 launch flow
 - TTY login → `startx` → `~/.xinitrc` (`exec i3`).

@@ -9,7 +9,7 @@ DEFAULT_STAGES=(check bootstrap install configure)
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--only STAGE[,STAGE...]] [--skip STAGE[,STAGE...]] [--dry-run] [--clean-bash] [-h|--help]
+Usage: $(basename "$0") [--only STAGE[,STAGE...]] [--skip STAGE[,STAGE...]] [--clean-bash] [-h|--help]
 
 Stages:
   check       Pre-flight: Arch Linux, non-root, pacman/git, internet
@@ -27,8 +27,6 @@ Default run: check, bootstrap, install, configure (doctor is opt-in).
 
   --only        Comma-separated list of stages to run.
   --skip        Comma-separated list of stages to skip (wins over --only).
-  --dry-run     Print link / prune / migrate / chsh / pacman.conf / bash-cleanup
-                ops instead of executing. Package installs still run.
   --clean-bash  In configure, remove ~/.bashrc, ~/.bash_profile, ~/.bash_logout
                 so they don't shadow the zsh init files. Destructive.
   -h, --help    Show this message.
@@ -65,12 +63,8 @@ tune_pacman_conf() {
         if grep -qE "^${opt}\b" "$conf"; then
             info "  $opt: already enabled"
         elif grep -qE "^#\s*${opt}\b" "$conf"; then
-            if (( DRY_RUN )); then
-                info "  [dry-run] would enable: $opt"
-            else
-                sudo sed -i -E "s/^#\s*(${opt}\b)/\1/" "$conf"
-                info "  Enabled: $opt"
-            fi
+            sudo sed -i -E "s/^#\s*(${opt}\b)/\1/" "$conf"
+            info "  Enabled: $opt"
         else
             warn "  $opt: pattern not found, skipping"
         fi
@@ -78,8 +72,6 @@ tune_pacman_conf() {
 
     if grep -qE "^ILoveCandy\b" "$conf"; then
         info "  ILoveCandy: already enabled"
-    elif (( DRY_RUN )); then
-        info "  [dry-run] would add: ILoveCandy"
     else
         sudo sed -i -E "/^\[options\]/a ILoveCandy" "$conf"
         info "  Enabled: ILoveCandy"
@@ -88,12 +80,8 @@ tune_pacman_conf() {
     if grep -qE "^\[multilib\]" "$conf"; then
         info "  [multilib]: already enabled"
     elif grep -qE "^#\s*\[multilib\]" "$conf"; then
-        if (( DRY_RUN )); then
-            info "  [dry-run] would enable: [multilib]"
-        else
-            sudo sed -i -E "/^#\s*\[multilib\]/,/^$/{s/^#\s*//}" "$conf"
-            info "  Enabled: [multilib]"
-        fi
+        sudo sed -i -E "/^#\s*\[multilib\]/,/^$/{s/^#\s*//}" "$conf"
+        info "  Enabled: [multilib]"
     else
         warn "  [multilib]: pattern not found, skipping"
     fi
@@ -291,8 +279,6 @@ stage_configure() {
     zsh_path="$(command -v zsh)"
     if [[ "$SHELL" == "$zsh_path" ]]; then
         info "zsh is already the default shell"
-    elif (( DRY_RUN )); then
-        info "[dry-run] would change default shell to zsh ($zsh_path)"
     else
         info "Changing default shell to zsh"
         chsh -s "$zsh_path"
@@ -308,12 +294,8 @@ stage_configure() {
                 continue
             fi
             [[ -e "$f" ]] || continue
-            if (( DRY_RUN )); then
-                info "  [dry-run] would remove: $f"
-            else
-                info "  Removing: $f"
-                rm -f -- "$f"
-            fi
+            info "  Removing: $f"
+            rm -f -- "$f"
         done
     fi
 }
@@ -438,7 +420,6 @@ validate_stages() {
 
 main() {
     local only="" skip=""
-    DRY_RUN=0
     CLEAN_BASH=0
     while (( $# > 0 )); do
         case "$1" in
@@ -448,13 +429,12 @@ main() {
             --skip)
                 [[ $# -ge 2 ]] || die "--skip requires an argument"
                 skip="$2"; shift 2 ;;
-            --dry-run) DRY_RUN=1; shift ;;
             --clean-bash) CLEAN_BASH=1; shift ;;
             -h|--help) usage; exit 0 ;;
             *) error "unknown option: $1"; usage >&2; exit 2 ;;
         esac
     done
-    export DRY_RUN CLEAN_BASH
+    export CLEAN_BASH
 
     validate_stages "--only" "$only"
     validate_stages "--skip" "$skip"
