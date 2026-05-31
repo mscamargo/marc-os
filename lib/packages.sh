@@ -113,6 +113,28 @@ pkg::refresh_keyring() {
     sudo pacman -S --needed --noconfirm archlinux-keyring
 }
 
+# pkg::run_pre_hook <key> <hooks_dir> — bash-exec <hooks_dir>/<key>.pre.sh in
+# a subshell if present. Returns the hook's exit code on failure.
+pkg::run_pre_hook() {
+    local hook="$2/$1.pre.sh"
+    [[ -f "$hook" ]] || return 0
+    if ! bash "$hook"; then
+        log::error "pre-hook failed for $1"
+        return 1
+    fi
+}
+
+# pkg::run_post_hook <key> <hooks_dir> — bash-exec <hooks_dir>/<key>.post.sh
+# in a subshell if present. Returns the hook's exit code on failure.
+pkg::run_post_hook() {
+    local hook="$2/$1.post.sh"
+    [[ -f "$hook" ]] || return 0
+    if ! bash "$hook"; then
+        log::error "post-hook failed for $1"
+        return 1
+    fi
+}
+
 # pkg::bootstrap_aur_helper — clone + makepkg-install yay. No-op if installed.
 pkg::bootstrap_aur_helper() {
     if util::has_command yay; then

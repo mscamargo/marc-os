@@ -67,12 +67,12 @@ install_row() {
     case "$tag" in
         ""|A)
             key="$name"
-            pacman -Qq "$name" &>/dev/null && already=1
+            pkg::is_installed_pacman "$name" && already=1
             ;;
         G)
             key="$(basename "$name" .git)"
-            export SRC_DIR="$HOME/.local/src/$key"
-            [[ -d "$SRC_DIR" ]] && already=1
+            export SRC_DIR="$PKG_SRC_ROOT/$key"
+            pkg::is_installed_git_src "$key" && already=1
             ;;
         *)
             error "[$i/$total] unknown tag '$tag' for $name"
@@ -80,33 +80,24 @@ install_row() {
             ;;
     esac
 
-    local pre="$REPO_ROOT/hooks/$key.pre.sh"
-    local post="$REPO_ROOT/hooks/$key.post.sh"
-
     if (( already )); then
         info "[$i/$total] $name: already installed"
     else
         info "[$i/$total] Installing $name: $desc"
     fi
 
-    if [[ -f "$pre" ]]; then
-        bash "$pre" || { error "pre-hook failed for $name"; return 1; }
-    fi
+    local hooks_dir="$REPO_ROOT/hooks"
+    pkg::run_pre_hook "$key" "$hooks_dir" || return 1
 
     if (( ! already )); then
         case "$tag" in
-            "")  sudo pacman -S --needed --noconfirm "$name" || return 1 ;;
-            A)   yay -S --needed --noconfirm "$name" || return 1 ;;
-            G)
-                mkdir -p "$(dirname "$SRC_DIR")"
-                git clone --depth 1 "$name" "$SRC_DIR" || return 1
-                ;;
+            "")  pkg::install_pacman  "$name"                   || return 1 ;;
+            A)   pkg::install_aur     "$name"                   || return 1 ;;
+            G)   pkg::install_git_src "$name" "$PKG_SRC_ROOT"   || return 1 ;;
         esac
     fi
 
-    if [[ -f "$post" ]]; then
-        bash "$post" || { error "post-hook failed for $name"; return 1; }
-    fi
+    pkg::run_post_hook "$key" "$hooks_dir" || return 1
 }
 
 stop_sudo_keepalive() {
