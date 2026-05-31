@@ -73,9 +73,9 @@ install_packages() {
     sudo::keepalive_start
 
     local rc=0
-    pkg::install_list "$data/pacman.list"  pacman "$hooks_dir" || rc=1
-    pkg::install_list "$data/aur.list"     aur    "$hooks_dir" || rc=1
-    pkg::install_list "$data/git_src.list" git    "$hooks_dir" || rc=1
+    pkg::install_list "$data/pacman.list" pacman "$hooks_dir" || rc=1
+    pkg::install_list "$data/aur.list" aur "$hooks_dir" || rc=1
+    pkg::install_list "$data/git_src.list" git "$hooks_dir" || rc=1
 
     sudo::keepalive_stop
 

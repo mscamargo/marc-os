@@ -51,8 +51,8 @@ _check_git_src() {
     fi
 }
 
-lists::for_each_row "$DATA_DIR/pacman.list"  _check_pacman
-lists::for_each_row "$DATA_DIR/aur.list"     _check_aur
+lists::for_each_row "$DATA_DIR/pacman.list" _check_pacman
+lists::for_each_row "$DATA_DIR/aur.list" _check_aur
 lists::for_each_row "$DATA_DIR/git_src.list" _check_git_src
 
 src_root="$REPO_ROOT/dotfiles"
@@ -110,9 +110,9 @@ if ((total == 0)); then
 fi
 
 log::error "Drift detected ($total finding(s)):"
-((missing_pkgs > 0))  && printf "  missing packages / sources: %d\n" "$missing_pkgs"  >&2
-((wrong_links > 0))   && printf "  wrong link targets:         %d\n" "$wrong_links"   >&2
+((missing_pkgs > 0)) && printf "  missing packages / sources: %d\n" "$missing_pkgs" >&2
+((wrong_links > 0)) && printf "  wrong link targets:         %d\n" "$wrong_links" >&2
 ((missing_links > 0)) && printf "  missing links:              %d\n" "$missing_links" >&2
-((shadow > 0))        && printf "  real files shadowing links: %d\n" "$shadow"        >&2
-((orphans > 0))       && printf "  orphan in-repo links:       %d\n" "$orphans"       >&2
+((shadow > 0)) && printf "  real files shadowing links: %d\n" "$shadow" >&2
+((orphans > 0)) && printf "  orphan in-repo links:       %d\n" "$orphans" >&2
 exit 1

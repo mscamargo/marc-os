@@ -7,11 +7,12 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 - Tunes `/etc/pacman.conf` (`Color`, `ILoveCandy`, `ParallelDownloads`,
   `VerbosePkgLists`, enables `[multilib]`), refreshes `archlinux-keyring`,
   runs `pacman -Syu`, and bootstraps the `yay` AUR helper
-- Installs every package listed in `packages.csv` (Xorg, audio, fonts, zsh,
-  neovim, i3 stack, apps, browsers, NetworkManager, bluez, plus a dev stack:
-  `mise`, `docker`, `openssh`, `fzf`/`ripgrep`/`fd`/`bat`/`eza`/`jq`/`yq`,
+- Installs every package listed in `data/pacman.list`, `data/aur.list`, and
+  `data/git_src.list` (Xorg, audio, fonts, zsh, neovim, i3 stack, apps,
+  browsers, NetworkManager, bluez, plus a dev stack: `mise`, `docker`,
+  `openssh`, `fzf`/`ripgrep`/`fd`/`bat`/`eza`/`jq`/`yq`,
   `github-cli`/`git-delta`/`lazygit`, `tmux`/`btop`, `httpie`/`bind`/`nmap`,
-  `python-pipx`/`uv`, `shellcheck`, …) and runs any matching
+  `python-pipx`/`uv`, `shellcheck`/`shfmt`, …) and runs any matching
   `hooks/<package>.{pre,post}.sh` scripts (e.g. enabling
   `NetworkManager.service` / `bluetooth.service` / `docker.service`,
   generating an ed25519 SSH key, materializing `mise` runtimes)
@@ -37,9 +38,9 @@ Three top-level scripts, no flags:
     ./configure.sh      # re-link dotfiles only (the frequent loop)
     ./doctor.sh         # read-only drift report; exits 1 on drift
 
-`install.sh` runs `check` → `bootstrap` → `install` → `setup_shell` →
-`configure_dotfiles` in order. All three scripts are idempotent: every
-helper self-skips work that's already done.
+`install.sh` runs `check` → `bootstrap` → `install_packages` → `setup_shell` →
+`dot::configure` in order. All three scripts are idempotent: every helper
+self-skips work that's already done.
 
 `install.sh` tees its output to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 (defaults to `~/.local/state/marc-os/`). No rotation; clean up manually.
@@ -57,33 +58,34 @@ in `~/.config/mise/config.toml` (Node LTS, Python, Go, Ruby) and enables
 
 ## Adding a package
 
-Edit `packages.csv`. Three columns, comma-separated, with a header row:
+Append a TAB-separated row to the file matching the install source:
 
-    tag,name,description
+| File | Source | First field |
+|------|--------|-------------|
+| `data/pacman.list`  | pacman | package name |
+| `data/aur.list`     | AUR (yay) | package name |
+| `data/git_src.list` | `git clone` to `~/.local/src/<repo>` | clone URL |
 
-| Tag | Source | `name` |
-|-----|--------|--------|
-| (blank) | pacman | package name |
-| `A` | AUR (yay) | package name |
-| `G` | `git clone` to `~/.local/src/<repo>` | clone URL |
-
-`tag` and `name` must not contain commas. `description` may contain commas
-if the field is wrapped in `"..."` (LARBS-style). The runner skips the
-header row, blank lines, and any line beginning with `#`. Hook discovery
-keys off `name` (or the repo basename for `G` rows), so package names
-containing `.` would make the suffix ambiguous — avoid them.
+Format is `name<TAB>description`. Blank lines and `#`-comments are skipped.
+A malformed row (missing TAB or empty name) aborts the run with a line
+number. Hook discovery keys off the first field (or the repo basename for
+`data/git_src.list` rows), so names containing `.` would make the suffix
+ambiguous — avoid them.
 
 ## Hooks
 
-Drop a script at `hooks/<package>.pre.sh` or `hooks/<package>.post.sh` and it
-runs around that package's install step — no CSV plumbing. Both hooks fire on
-every `install.sh` run as long as the package is present (or about to be), so
-they must be idempotent. For `G` rows, `<package>` is the repo basename
-without `.git` (matches `SRC_DIR`).
+Drop a script at `hooks/<package>.pre.sh` or `hooks/<package>.post.sh` and
+it runs around that package's install step — no list plumbing. Both hooks
+fire on every `install.sh` run as long as the package is present (or about
+to be), so they must be idempotent. For `data/git_src.list` rows,
+`<package>` is the repo basename without `.git` (matches `SRC_DIR`).
 
-Hooks run as `bash <path>` with `PKG_NAME`, `PKG_TAG`, `PKG_DESC` exported
-(and `SRC_DIR` for `G` rows). Source `../functions.sh` for shared helpers
-(e.g. `enable_service <unit>` for the common "enable + start" pattern).
+Hooks run as `bash <path>` in a subshell with `PKG_NAME`, `PKG_KIND` (one
+of `pacman`/`aur`/`git`), and `PKG_DESC` exported (and `SRC_DIR` for `git`
+rows). Each hook self-sources the lib files it uses (`lib/log.sh`,
+`lib/packages.sh`, …) via a 4-line preamble; see existing hooks for the
+exact shape. The common "enable + start a unit" pattern is
+`pkg::enable_service <unit>`.
 
 ## Dotfiles
 
@@ -108,23 +110,53 @@ target tree and never dirty the repo. The first run after upgrading from the
 old dir-symlink layout transparently replaces ancestor dir-symlinks with
 real directories.
 
-`configure_dotfiles` also prunes any symlink that resolves into the repo but
-whose target file is gone — so deleting a file from `dotfiles/` is enough; the
-next `./configure.sh` run cleans up the orphan link.
+`dot::configure` also prunes any symlink that resolves into the repo but
+whose target file is gone — so deleting a file from `dotfiles/` is enough;
+the next `./configure.sh` run cleans up the orphan link.
+
+## Architecture
+
+```
+install.sh ────┐
+configure.sh ──┤
+doctor.sh ─────┤
+hooks/*.sh ────┤   (each script self-sources only what it directly calls)
+               ▼
+        ┌──────────────┐
+        │  lib/log.sh  │  ◀── (no deps)
+        ├──────────────┤
+        │  lib/util.sh │  ◀── (no deps)
+        ├──────────────┤
+        │  lib/sudo.sh │  ──▶ lib/log.sh
+        │ lib/lists.sh │  ──▶ lib/log.sh
+        │ lib/dotfiles │  ──▶ lib/log.sh
+        │ lib/packages │  ──▶ lib/{log,util,lists}.sh
+        └──────────────┘
+```
+
+Every `lib/*.sh` opens with a sentinel-var guard, so transitive sourcing
+is a no-op and files may be sourced in any order. `check.sh` is the
+exception — it lints the lib and therefore sources nothing from `lib/`.
+
+Conventions: every public lib function uses `module::function` naming;
+functions take their data as explicit arguments (no ambient state); shared
+constants (`PKG_SRC_ROOT`, `SUDO_KEEPALIVE_INTERVAL`, colors) live
+`readonly` at the top of their owning module. See `AGENTS.md` for the
+full style guide.
 
 ## Structure
 
-- `install.sh` — new-machine setup entry point.
-- `configure.sh` — dotfile re-link entry point.
-- `doctor.sh` — drift report entry point.
-- `functions.sh` — shared helpers (`info`, `die`, `pacman_install`,
-  `enable_service`, `link_dotfile`, `prune_stale_links_in`, `parse_row`,
-  `configure_dotfiles`, …) sourced by all three scripts and each hook.
-- `packages.csv` — package manifest.
+- `install.sh` / `configure.sh` / `doctor.sh` — entry points.
+- `check.sh` — runs `shellcheck -x` + `shfmt -d -i 4 -ci -sr -bn` over
+  every `*.sh`. Self-contained.
+- `lib/` — shared modules (`log`, `util`, `sudo`, `lists`, `packages`,
+  `dotfiles`). One concept per file. See "Architecture" above.
+- `data/` — TAB-separated package lists: `pacman.list`, `aur.list`,
+  `git_src.list`.
 - `hooks/` — per-package install hooks, discovered by filename convention
-  (`<package>.pre.sh`, `<package>.post.sh`).
+  (`<package>.pre.sh`, `<package>.post.sh`). Each is subshell-executed
+  with its own preamble.
 - `dotfiles/` — mirrors `$HOME`. Every file is leaf-symlinked into place.
-- `check.sh` — ad-hoc `shellcheck` runner over all `*.sh`.
 - `vm-*.sh` — helper scripts for QEMU VM workflows.
 
 ## License

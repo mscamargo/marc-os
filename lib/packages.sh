@@ -154,7 +154,10 @@ pkg::install_list() {
     local total=${#rows[@]}
     local label
     label="$(basename "$list" .list)"
-    ((total > 0)) || { log::info "no rows in $label.list"; return 0; }
+    ((total > 0)) || {
+        log::info "no rows in $label.list"
+        return 0
+    }
 
     log::info "Installing $total $kind package(s) from $label.list"
 

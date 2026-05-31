@@ -67,3 +67,4 @@ uv	Fast Python package and project manager
 docker	Container runtime
 docker-compose	Multi-container Docker apps
 shellcheck	Static analysis for shell scripts
+shfmt	Shell script formatter
