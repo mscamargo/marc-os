@@ -59,9 +59,3 @@ link_dotfile() {
     success "Linked: $dest -> $src"
 }
 
-run_hook() {
-    local hook="$1"
-    local path="$REPO_ROOT/$hook"
-    [[ -f "$path" ]] || { error "hook missing: $hook"; return 1; }
-    bash "$path"
-}

@@ -68,26 +68,21 @@ stage_bootstrap() {
 # ---------- stage: install ----------
 
 install_row() {
-    local tag="$1" name="$2" desc="$3" pre="$4" post="$5" i="$6" total="$7"
+    local tag="$1" name="$2" desc="$3" i="$4" total="$5"
 
     unset SRC_DIR
     export PKG_NAME="$name" PKG_TAG="$tag" PKG_DESC="$desc"
 
+    local key already=0
     case "$tag" in
         ""|A)
-            if pacman -Qq "$name" &>/dev/null; then
-                info "[$i/$total] $name: already installed, skipping"
-                return 0
-            fi
+            key="$name"
+            pacman -Qq "$name" &>/dev/null && already=1
             ;;
         G)
-            local repo_name
-            repo_name="$(basename "$name" .git)"
-            export SRC_DIR="$HOME/.local/src/$repo_name"
-            if [[ -d "$SRC_DIR" ]]; then
-                info "[$i/$total] $name: already cloned at $SRC_DIR, skipping"
-                return 0
-            fi
+            key="$(basename "$name" .git)"
+            export SRC_DIR="$HOME/.local/src/$key"
+            [[ -d "$SRC_DIR" ]] && already=1
             ;;
         *)
             error "[$i/$total] unknown tag '$tag' for $name"
@@ -95,23 +90,32 @@ install_row() {
             ;;
     esac
 
-    info "[$i/$total] Installing $name: $desc"
+    local pre="$REPO_ROOT/hooks/$key.pre.sh"
+    local post="$REPO_ROOT/hooks/$key.post.sh"
 
-    if [[ -n "$pre" ]]; then
-        run_hook "$pre" || { error "pre-hook failed for $name"; return 1; }
+    if (( already )); then
+        info "[$i/$total] $name: already installed"
+    else
+        info "[$i/$total] Installing $name: $desc"
     fi
 
-    case "$tag" in
-        "")  sudo pacman -S --needed --noconfirm "$name" || return 1 ;;
-        A)   yay -S --needed --noconfirm "$name" || return 1 ;;
-        G)
-            mkdir -p "$(dirname "$SRC_DIR")"
-            git clone --depth 1 "$name" "$SRC_DIR" || return 1
-            ;;
-    esac
+    if [[ -f "$pre" ]]; then
+        bash "$pre" || { error "pre-hook failed for $name"; return 1; }
+    fi
 
-    if [[ -n "$post" ]]; then
-        run_hook "$post" || { error "post-hook failed for $name"; return 1; }
+    if (( ! already )); then
+        case "$tag" in
+            "")  sudo pacman -S --needed --noconfirm "$name" || return 1 ;;
+            A)   yay -S --needed --noconfirm "$name" || return 1 ;;
+            G)
+                mkdir -p "$(dirname "$SRC_DIR")"
+                git clone --depth 1 "$name" "$SRC_DIR" || return 1
+                ;;
+        esac
+    fi
+
+    if [[ -f "$post" ]]; then
+        bash "$post" || { error "post-hook failed for $name"; return 1; }
     fi
 }
 
@@ -126,11 +130,11 @@ stage_install() {
     info "Installing $total packages from packages.csv"
 
     local failed=()
-    local i=0 row tag name desc pre post
+    local i=0 row tag name desc
     for row in "${rows[@]}"; do
         i=$((i + 1))
-        IFS=',' read -r tag name desc pre post <<< "$row"
-        if ! install_row "$tag" "$name" "$desc" "$pre" "$post" "$i" "$total"; then
+        IFS=',' read -r tag name desc <<< "$row"
+        if ! install_row "$tag" "$name" "$desc" "$i" "$total"; then
             failed+=("$name")
         fi
     done
