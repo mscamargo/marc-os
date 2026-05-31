@@ -19,6 +19,15 @@ link_dotfile "$CONFIG_DIR/zsh/.zprofile" "$HOME/.zprofile"
 # Neovim
 link_dotfile "$CONFIG_DIR/nvim" "$HOME/.config/nvim"
 
+# i3 stack
+link_dotfile "$CONFIG_DIR/i3"          "$HOME/.config/i3"
+link_dotfile "$CONFIG_DIR/i3status"    "$HOME/.config/i3status"
+link_dotfile "$CONFIG_DIR/alacritty"   "$HOME/.config/alacritty"
+link_dotfile "$CONFIG_DIR/rofi"        "$HOME/.config/rofi"
+link_dotfile "$CONFIG_DIR/dunst"       "$HOME/.config/dunst"
+link_dotfile "$CONFIG_DIR/picom"       "$HOME/.config/picom"
+link_dotfile "$CONFIG_DIR/qutebrowser" "$HOME/.config/qutebrowser"
+
 # Custom scripts
 mkdir -p "$HOME/.local/bin"
 if [[ -d "$CONFIG_DIR/bin" ]]; then
