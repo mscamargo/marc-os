@@ -1,0 +1,27 @@
+[global]
+    font = "monospace 10"
+    follow = keyboard
+    width = 300
+    height = 100
+    origin = top-right
+    offset = 10x40
+    frame_width = 1
+    frame_color = "#ffffff"
+    padding = 8
+    horizontal_padding = 8
+
+[urgency_low]
+    background = "#222222"
+    foreground = "#bbbbbb"
+    timeout = 5
+
+[urgency_normal]
+    background = "#222222"
+    foreground = "#ffffff"
+    timeout = 10
+
+[urgency_critical]
+    background = "#900000"
+    foreground = "#ffffff"
+    frame_color = "#ff0000"
+    timeout = 0

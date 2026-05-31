@@ -1,0 +1,7 @@
+configuration {
+    modes: "drun,run,window";
+    show-icons: false;
+    font: "monospace 11";
+}
+
+@theme "default"
