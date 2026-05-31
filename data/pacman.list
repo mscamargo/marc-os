@@ -3,10 +3,14 @@ xorg-server	X.Org display server
 xorg-xinit	startx and xinit helpers
 xorg-xrandr	RandR CLI for display config
 xorg-xsetroot	Root window utility
+xorg-xset	X server preferences CLI (used by i3 idle config)
 pipewire	Modern audio/video server
 pipewire-pulse	PulseAudio replacement for PipeWire
+pipewire-alsa	ALSA compatibility for PipeWire
+pipewire-jack	JACK compatibility for PipeWire
 wireplumber	PipeWire session manager
 alsa-utils	Userspace ALSA utilities
+pavucontrol	PulseAudio/PipeWire volume control GUI
 brightnessctl	Backlight and LED brightness control
 acpi	Battery and thermal info CLI
 noto-fonts	Google Noto base fonts
