@@ -8,9 +8,9 @@ symlink dotfiles. No package manager, no tests, no CI.
 | Path | Purpose |
 |------|---------|
 | `install.sh` | Entry point. Defines one `stage_<name>` function per stage and a `main` that runs them with optional `--only`/`--skip` filters. |
-| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `link_dotfile`, `run_hook`. Sourced by `install.sh` and each hook. |
+| `functions.sh` | Shared helpers: `info`, `warn`, `error`, `success`, `die`, `check_command`, `pacman_install`, `link_dotfile`. Sourced by `install.sh` and each hook. |
 | `packages.csv` | LARBS-style package manifest consumed by `stage_install`. |
-| `hooks/` | Optional pre/post-install scripts referenced from `packages.csv`. |
+| `hooks/` | Optional pre/post-install scripts. Discovered by filename: `hooks/<package>.pre.sh` and `hooks/<package>.post.sh`. |
 | `config/` | Dotfiles. Linked into `$HOME` and `$HOME/.config/` by `stage_configure`. |
 | `config/bin/` | Custom executable scripts. Linked into `$HOME/.local/bin/`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
@@ -39,10 +39,10 @@ fail with the underlying error.
 
 ## packages.csv format
 
-Five columns, comma-separated, unquoted, with a header row on line 1.
+Three columns, comma-separated, unquoted, with a header row on line 1.
 **Fields must not contain commas.** Blank lines are skipped.
 
-    tag,name,description,pre-install-script,post-install-script
+    tag,name,description
 
 | Tag | Meaning | `name` field |
 |-----|---------|--------------|
@@ -50,16 +50,27 @@ Five columns, comma-separated, unquoted, with a header row on line 1.
 | `A` | AUR via `yay` | package name |
 | `G` | `git clone` to `~/.local/src/<repo>` | clone URL |
 
-Hook columns are paths relative to repo root (e.g. `hooks/enable-bluetooth.sh`).
-Empty cell = no hook. Hooks run as `bash "$REPO_ROOT/<path>"` with these env
-vars exported: `PKG_NAME`, `PKG_TAG`, `PKG_DESC`; for `G` rows, `SRC_DIR` is
-also set to the clone target. Hooks should `source ../functions.sh` for shared
-helpers.
+## Hooks
 
-`stage_install` skips rows whose package is already installed (`pacman -Qq`) or
-whose `SRC_DIR` already exists. Row failures are collected and reported in a
-final summary; the run continues after each failure and the stage exits
-non-zero if any row failed. Other stages are fail-fast.
+Hooks are discovered by filename convention, not declared in the CSV. For a
+package keyed `<pkg>`, `install_row` looks for `hooks/<pkg>.pre.sh` and
+`hooks/<pkg>.post.sh` and runs whichever exists, before and after the install
+step respectively. The key is the package name for pacman/AUR rows, and the
+repo basename (without `.git`) for `G` rows — same derivation as `SRC_DIR`.
+
+Both hooks fire **every run** as long as the package is present (or about to
+be installed). The install step itself is skipped when already installed
+(`pacman -Qq` / `SRC_DIR` check), but the hooks still run. They must
+therefore be idempotent. Hooks run as `bash <path>` with `PKG_NAME`,
+`PKG_TAG`, `PKG_DESC` exported (and `SRC_DIR` for `G` rows). Hooks should
+`source ../functions.sh` for shared helpers.
+
+Row failures (install or hook) are collected and reported in a final summary;
+the run continues after each failure and the stage exits non-zero if any row
+failed. Other stages are fail-fast.
+
+Known limitation: package names containing `.` would make the suffix
+ambiguous. No current package has one.
 
 ## Critical workflow details
 

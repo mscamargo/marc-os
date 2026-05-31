@@ -6,8 +6,9 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 
 - Updates the system and bootstraps `yay` AUR helper
 - Installs every package listed in `packages.csv` (Xorg, audio, fonts, zsh,
-  neovim, i3 stack, apps, browsers, NetworkManager, bluez, …) and runs the
-  per-row hooks (e.g. enabling `NetworkManager.service` and `bluetooth.service`)
+  neovim, i3 stack, apps, browsers, NetworkManager, bluez, …) and runs any
+  matching `hooks/<package>.{pre,post}.sh` scripts (e.g. enabling
+  `NetworkManager.service` and `bluetooth.service`)
 - Links dotfiles into `$HOME`
 - Sets zsh as the default shell
 
@@ -34,9 +35,9 @@ TTY and run `startx` to launch i3.
 
 ## Adding a package
 
-Edit `packages.csv`. Five columns, comma-separated, with a header row:
+Edit `packages.csv`. Three columns, comma-separated, with a header row:
 
-    tag,name,description,pre-install-script,post-install-script
+    tag,name,description
 
 | Tag | Source | `name` |
 |-----|--------|--------|
@@ -44,17 +45,28 @@ Edit `packages.csv`. Five columns, comma-separated, with a header row:
 | `A` | AUR (yay) | package name |
 | `G` | `git clone` to `~/.local/src/<repo>` | clone URL |
 
-Hook columns hold paths to scripts under `hooks/` (relative to repo root),
-or are empty. Fields must not contain commas. The runner skips the header
-row and blank lines.
+Fields must not contain commas. The runner skips the header row and blank
+lines.
+
+## Hooks
+
+Drop a script at `hooks/<package>.pre.sh` or `hooks/<package>.post.sh` and it
+runs around that package's install step — no CSV plumbing. Both hooks fire on
+every `install.sh` run as long as the package is present (or about to be), so
+they must be idempotent. For `G` rows, `<package>` is the repo basename
+without `.git` (matches `SRC_DIR`).
+
+Hooks run as `bash <path>` with `PKG_NAME`, `PKG_TAG`, `PKG_DESC` exported
+(and `SRC_DIR` for `G` rows). Source `../functions.sh` for shared helpers.
 
 ## Structure
 
 - `install.sh` — entry point. All stage logic lives here as functions.
 - `functions.sh` — shared helpers (`info`, `die`, `pacman_install`,
-  `link_dotfile`, `run_hook`, …) sourced by `install.sh` and each hook.
+  `link_dotfile`, …) sourced by `install.sh` and each hook.
 - `packages.csv` — package manifest.
-- `hooks/` — per-package install hooks referenced from `packages.csv`.
+- `hooks/` — per-package install hooks, discovered by filename convention
+  (`<package>.pre.sh`, `<package>.post.sh`).
 - `config/` — dotfiles.
 - `vm-*.sh` — helper scripts for QEMU VM workflows.
 
