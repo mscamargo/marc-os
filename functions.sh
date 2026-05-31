@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Shared helpers for install.sh and per-package hooks.
+# Sourced; does not set -e itself (callers do).
 
-# Colors
 readonly C_RESET='\033[0m'
 readonly C_RED='\033[0;31m'
 readonly C_GREEN='\033[0;32m'
 readonly C_YELLOW='\033[0;33m'
 readonly C_BLUE='\033[0;34m'
 
-# Repo root
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 info() {
     printf "${C_BLUE}==>${C_RESET} %s\n" "$1"
@@ -33,10 +32,7 @@ die() {
 }
 
 check_command() {
-    if ! command -v "$1" &>/dev/null; then
-        return 1
-    fi
-    return 0
+    command -v "$1" &>/dev/null
 }
 
 pacman_install() {
@@ -61,4 +57,11 @@ link_dotfile() {
     mkdir -p "$(dirname "$dest")"
     ln -sfn "$src" "$dest"
     success "Linked: $dest -> $src"
+}
+
+run_hook() {
+    local hook="$1"
+    local path="$REPO_ROOT/$hook"
+    [[ -f "$path" ]] || { error "hook missing: $hook"; return 1; }
+    bash "$path"
 }
