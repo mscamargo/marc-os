@@ -203,9 +203,33 @@ run `./install.sh && ./doctor.sh && ./check.sh`.
 
 ## VM testing
 
-`vm-start.sh`, `vm-shutdown.sh`, `vm-restore.sh` use `quickemu` with a
-hard-coded VM path (`~/vms/archlinux/archlinux-latest.conf`).
-`vm-sync.sh` copies the repo into the VM via `scp -P 22220`.
+All `vm-*.sh` wrappers use `quickemu` with a hard-coded VM path
+(`~/vms/archlinux/archlinux-latest.conf`).
+
+| Script | Purpose |
+|--------|---------|
+| `vm-start.sh` | `quickemu --vm …` — start the VM with whatever the conf currently says. |
+| `vm-shutdown.sh` | `monitor-cmd system_powerdown` — graceful shutdown. |
+| `vm-snapshot.sh [tag]` | Create a snapshot (default tag `clean-base`). |
+| `vm-restore.sh` | Apply the `clean-base` snapshot. |
+| `vm-sync.sh` | `scp -P 22220` the repo into the running VM. |
+| `vm-recreate.sh` | Shutdown, `rm` `disk.qcow2`, uncomment `iso=`, start. Fresh ISO boot for testing `bootstrap.sh`. |
+| `vm-boot-disk.sh` | Shutdown, comment `iso=`, start. Boot from the installed disk (no CDROM attached). |
+
+Typical bootstrap-test loop:
+
+```
+./vm-recreate.sh                                              # fresh ISO boot
+# in guest: curl -L .../iso-bootstrap | bash                  # run bootstrap.sh
+# in guest: poweroff                                          # after handoff message
+./vm-boot-disk.sh                                             # reboot off the new disk
+# in guest: log in, cd ~/Work/marc-os && ./install.sh
+./vm-snapshot.sh clean-base                                   # save the post-install state
+```
+
+`vm-recreate.sh` and `vm-boot-disk.sh` `sed` the `iso=` line in
+`archlinux-latest.conf` in-place, so the conf file is the source of truth
+for whether the CDROM is attached.
 
 ## Commit style
 
