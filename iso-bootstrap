@@ -2,7 +2,7 @@
 # iso-bootstrap — curl-bash entry point fetched on the Arch ISO.
 # Installs git, clones marc-os to /root/marc-os, execs bootstrap.sh.
 #
-#   curl -L https://raw.githubusercontent.com/mscamargo/marc-os/master/iso-bootstrap | bash
+#   curl -L https://mscamargo.github.io/marc-os/iso-bootstrap | bash
 set -euo pipefail
 
 readonly REPO_URL="https://github.com/mscamargo/marc-os.git"

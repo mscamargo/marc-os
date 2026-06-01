@@ -34,7 +34,7 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 
 For a fresh machine, boot the Arch ISO and run:
 
-    curl -L https://raw.githubusercontent.com/mscamargo/marc-os/master/iso-bootstrap | bash
+    curl -L https://mscamargo.github.io/marc-os/iso-bootstrap | bash
 
 `iso-bootstrap` is a 10-line entry script that `pacman -Sy git`, clones this
 repo to `/root/marc-os`, and execs `./bootstrap.sh`. `bootstrap.sh` prompts
