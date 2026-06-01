@@ -38,11 +38,14 @@ Flow:
   1. Prompt for hostname, target disk, CPU microcode (with detected defaults).
   2. Confirm by retyping the full disk path — then wipe and partition.
   3. Format ESP as FAT32 and root as ext4, mount under /mnt, create 8G swapfile.
-  4. pacstrap base + kernel + ucode + sudo + networkmanager + git + neovim + openssh.
-  5. arch-chroot: timezone, locale (en_US + pt_BR), keymap, hostname, initramfs,
+  4. Refresh mirrors (reflector, Brazil+US, https, latest 20 by rate) and enable
+     ParallelDownloads in /etc/pacman.conf so pacstrap runs in parallel.
+  5. pacstrap base + kernel + ucode + sudo + networkmanager + git + neovim + openssh.
+     Re-enable ParallelDownloads in /mnt/etc/pacman.conf for the installed system.
+  6. arch-chroot: timezone, locale (en_US + pt_BR), keymap, hostname, initramfs,
      systemd-boot, NetworkManager enabled, user (password-prompted wheel sudo,
      root locked), marc-os cloned to ~$USERNAME/$REPO_DEST_REL.
-  6. Print handoff. Reboot, log in, then run ./install.sh by hand.
+  7. Print handoff. Reboot, log in, then run ./install.sh by hand.
 
 Re-runs wipe from scratch. The EXIT trap unmounts /mnt on any exit.
 EOF
@@ -59,7 +62,7 @@ preflight() {
 
     local cmd
     for cmd in pacstrap arch-chroot sgdisk wipefs genfstab blkid \
-        mkfs.ext4 mkfs.fat mkswap partprobe udevadm lsblk; do
+        mkfs.ext4 mkfs.fat mkswap partprobe udevadm lsblk reflector; do
         util::has_command "$cmd" || log::die "$cmd not found on the live ISO."
     done
 
@@ -134,6 +137,23 @@ EOF
 }
 
 # ---------- stages ----------
+
+refresh_mirrors() {
+    log::info "Refreshing mirrors via reflector (Brazil, United States)"
+    reflector \
+        --country Brazil,'United States' \
+        --age 12 \
+        --protocol https \
+        --latest 20 \
+        --sort rate \
+        --save /etc/pacman.d/mirrorlist
+}
+
+enable_parallel_downloads() {
+    local conf="$1"
+    log::info "Enabling ParallelDownloads in $conf"
+    sed -i 's/^#ParallelDownloads/ParallelDownloads/' "$conf"
+}
 
 partition() {
     local disk="$1"
@@ -323,10 +343,15 @@ EOF
 
     _confirm_wipe "$disk"
 
+    refresh_mirrors
+    enable_parallel_downloads /etc/pacman.conf
+
     partition "$disk"
     format_and_mount "$disk"
     pacstrap_base "$ucode"
     write_fstab_and_swap
+
+    enable_parallel_downloads /mnt/etc/pacman.conf
 
     local root_partuuid
     root_partuuid="$(blkid -s PARTUUID -o value "$(_partition_path "$disk" 2)")"
