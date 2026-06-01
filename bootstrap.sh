@@ -289,6 +289,10 @@ main() {
 
     trap 'umount -R /mnt 2>/dev/null || true' EXIT
 
+    # Re-attach stdin to the controlling tty so `read` works when bootstrap.sh
+    # is reached via `curl … | bash` (the pipe leaves stdin at EOF).
+    exec < /dev/tty
+
     preflight
 
     local hostname disk ucode disk_default ucode_default
