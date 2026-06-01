@@ -1,12 +1,15 @@
 # AGENTS.md — marc-os
 
-Personal Arch Linux setup. Shell scripts that install the i3wm stack and
-symlink dotfiles. No package manager, no tests, no CI.
+Personal Arch Linux setup. Shell scripts that bare-metal install Arch and
+then layer the i3wm stack + dotfiles on top. No package manager, no tests,
+no CI.
 
 ## Repository structure
 
 | Path | Purpose |
 |------|---------|
+| `iso-bootstrap` | Curl-bash entry on the Arch ISO. `pacman -Sy git`, clone repo to `/root/marc-os`, `exec bootstrap.sh`. Extensionless on purpose (URL endpoint). Not picked up by `check.sh` because its glob is `*.sh`; lint manually if edited. |
+| `bootstrap.sh` | Bare-metal Arch installer (replaces archinstall). Runs as root on the Arch ISO. Prompts hostname/disk/microcode (detected defaults), retype-disk-path confirmation, then partitions GPT (1G ESP + ext4 root), 8G swapfile, pacstraps a minimal base, chroot-configures locale/keymap/timezone/hostname/systemd-boot/NetworkManager, creates user (wheel password-prompted, root locked), clones marc-os to `~$USER/Work/marc-os`. Console-only output, no log file. EXIT trap unmounts `/mnt`. UEFI-only. Re-runs wipe from scratch. |
 | `install.sh` | New-machine setup entry point. `main` runs `check` → `bootstrap` → `install_packages` → `setup_shell` → `dot::configure` end-to-end. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. Only flag is `-h`/`--help`. |
 | `configure.sh` | Re-link dotfiles only. `log::assert_non_root` + `dot::configure`. No flags, no log file. |
 | `doctor.sh` | Read-only drift report. `log::assert_non_root` + walk `data/*.list` and `dotfiles/`, exit non-zero on drift. No flags, no log file. |
@@ -26,15 +29,16 @@ symlink dotfiles. No package manager, no tests, no CI.
 
 ## Entry points
 
-Three single-purpose scripts. No flag dispatcher, no `--only`/`--skip`.
-Idempotency holds across all of them: every helper self-skips work that's
-already done, so re-running is safe.
+Four single-purpose scripts at the root. `bootstrap.sh` is one-shot
+(destructive); the rest are idempotent — every helper self-skips work
+that's already done, so re-running is safe.
 
-| Script | Steps | Pre-flight |
-|--------|-------|-----------|
-| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `dot::configure` | Arch + non-root + pacman + internet |
-| `configure.sh` | `dot::configure` | non-root |
-| `doctor.sh` | walk `data/*.list` + `dotfiles/`; report missing pkgs, wrong/missing/shadowed links, orphan in-repo links | non-root |
+| Script | Steps | Pre-flight | Re-runnable? |
+|--------|-------|-----------|--------------|
+| `bootstrap.sh` | prompts → `partition` → `format_and_mount` → `pacstrap_base` → `write_fstab_and_swap` → `configure_chroot` → `create_user` → `clone_repo` → `handoff` | root + Arch ISO + UEFI + tools (`pacstrap`, `arch-chroot`, `sgdisk`, `wipefs`, `genfstab`, `blkid`, `mkfs.*`, `mkswap`, `partprobe`, `udevadm`, `lsblk`) + internet | One-shot; re-runs wipe from scratch via `sgdisk --zap-all && wipefs -af` |
+| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `dot::configure` | Arch + non-root + pacman + internet | Yes |
+| `configure.sh` | `dot::configure` | non-root | Yes |
+| `doctor.sh` | walk `data/*.list` + `dotfiles/`; report missing pkgs, wrong/missing/shadowed links, orphan in-repo links | non-root | Yes |
 
 ### `install.sh` step breakdown
 
@@ -48,13 +52,39 @@ already done, so re-running is safe.
 
 `-h` / `--help` prints usage. Any other flag exits non-zero.
 
+### `bootstrap.sh` constants and config
+
+Hardcoded `readonly` block at the top:
+
+| Constant | Value |
+|----------|-------|
+| `USERNAME` | `mscamargo` |
+| `USER_SHELL` | `/bin/bash` (marc-os `setup_shell` `chsh`s to zsh later) |
+| `LOCALE` / `EXTRA_LOCALES` | `en_US.UTF-8` / `(pt_BR.UTF-8)` — both uncommented in `/etc/locale.gen`, `LANG=$LOCALE` in `/etc/locale.conf` |
+| `TIMEZONE` | `America/Sao_Paulo` |
+| `KEYMAP` | `us` (console `vconsole.conf`) |
+| `REPO_URL` | `https://github.com/mscamargo/marc-os.git` (HTTPS — no SSH key on the new system yet) |
+| `REPO_DEST_REL` | `Work/marc-os` (relative to `~$USERNAME`) |
+| `ESP_SIZE` / `SWAP_SIZE` | `1G` / `8G` |
+| `PACSTRAP_PKGS` | `base linux linux-firmware sudo networkmanager git neovim openssh` (microcode appended after CPU prompt) |
+
+Per-machine variables (`hostname`, `disk`, `ucode`) are prompted in `main`
+with detected defaults from `lsblk -ndb` (largest non-USB disk) and
+`/proc/cpuinfo` (`vendor_id` → `intel-ucode`/`amd-ucode`). The destructive
+wipe is gated by retyping the full disk path verbatim; mismatched input
+calls `log::die`. The `bootstrap::*` namespace is reserved for any future
+helpers; current internal helpers use a single-underscore prefix
+(`_prompt`, `_detect_disk`, `_detect_ucode`, `_partition_path`,
+`_disk_info_line`, `_confirm_wipe`).
+
 ### Logging
 
 `install.sh` opens `$XDG_STATE_HOME/marc-os/install-<timestamp>.log` and
 `tee`s stdout and stderr to it via `exec > >(tee -a ...) 2> >(tee -a ... >&2)`.
 ANSI codes are preserved in the log; read with `less -R`. No rotation. The
 last 1–2 lines may not flush on `set -e` crashes (process-substitution
-limitation). `configure.sh` and `doctor.sh` do not log.
+limitation). `bootstrap.sh`, `configure.sh`, and `doctor.sh` do not log to
+a file — console only.
 
 ## data/*.list format
 
@@ -160,8 +190,16 @@ After any change, run:
 ./doctor.sh       # zero drift (on a marc-os host)
 ```
 
-For an end-to-end test, restore a fresh VM, sync the repo, then inside the
-VM: `./install.sh && ./doctor.sh && ./check.sh`. All three must succeed.
+`check.sh` globs `*.sh`, so `iso-bootstrap` (extensionless) is skipped — if
+you edit it, manually run `shellcheck --shell=bash iso-bootstrap` and
+`shfmt -d -i 4 -ci -sr -bn iso-bootstrap`.
+
+For an end-to-end test of marc-os, restore a fresh VM, sync the repo, then
+inside the VM: `./install.sh && ./doctor.sh && ./check.sh`.
+
+For an end-to-end test of `bootstrap.sh`, boot a blank-disk VM from the
+Arch ISO and run the curl-bash one-liner; after first reboot, log in and
+run `./install.sh && ./doctor.sh && ./check.sh`.
 
 ## VM testing
 

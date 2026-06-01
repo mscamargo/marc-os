@@ -30,6 +30,24 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 - Internet connection
 - Run as a regular user (not root)
 
+## Bare-metal install (replaces archinstall)
+
+For a fresh machine, boot the Arch ISO and run:
+
+    curl -L https://raw.githubusercontent.com/mscamargo/marc-os/master/iso-bootstrap | bash
+
+`iso-bootstrap` is a 10-line entry script that `pacman -Sy git`, clones this
+repo to `/root/marc-os`, and execs `./bootstrap.sh`. `bootstrap.sh` prompts
+for hostname/disk/CPU (with detected defaults), asks you to retype the disk
+path to confirm wipe, then partitions (1G ESP + ext4 root + 8G swapfile),
+pacstraps a minimal base, configures locale/keymap/timezone/hostname,
+installs systemd-boot, creates the user (password-prompted wheel sudo, root
+locked), and clones marc-os into `~$USER/Work/marc-os`. Reboot, log in, run
+`./install.sh` by hand for the rest of the setup.
+
+`bootstrap.sh` is single-shot: re-running wipes from scratch. No log file —
+output is console-only. UEFI-only, no encryption, no LVM, no btrfs.
+
 ## Usage
 
 Three top-level scripts, no flags:
@@ -146,7 +164,10 @@ full style guide.
 
 ## Structure
 
-- `install.sh` / `configure.sh` / `doctor.sh` — entry points.
+- `iso-bootstrap` / `bootstrap.sh` — bare-metal installer; replaces
+  archinstall. Run on the Arch ISO, not on an installed system.
+- `install.sh` / `configure.sh` / `doctor.sh` — entry points (run on an
+  installed system as your user).
 - `check.sh` — runs `shellcheck -x` + `shfmt -d -i 4 -ci -sr -bn` over
   every `*.sh`. Self-contained.
 - `lib/` — shared modules (`log`, `util`, `sudo`, `lists`, `packages`,
