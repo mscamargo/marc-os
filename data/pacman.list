@@ -17,6 +17,9 @@ noto-fonts	Google Noto base fonts
 noto-fonts-emoji	Google Noto color emoji
 ttf-hack	Hack monospace font
 ttf-jetbrains-mono	JetBrains Mono font
+ttf-jetbrains-mono-nerd	JetBrains Mono patched with Nerd Font glyphs
+ttf-dejavu	DejaVu fallback fonts
+ttf-liberation	Liberation fallback fonts
 zsh	Z shell
 zsh-completions	Extra zsh completions
 zsh-syntax-highlighting	zsh syntax highlighting
@@ -39,6 +42,8 @@ chromium	Open-source Chromium browser
 yazi	Terminal file manager
 lf	Terminal file manager
 ranger	VIM-inspired file manager
+gvfs	Virtual filesystem layer (trash, MTP, network mounts)
+gvfs-mtp	MTP backend for gvfs (Android phones)
 maim	Screenshot utility
 slop	Region selection for screenshots
 xclip	X11 clipboard CLI
@@ -47,6 +52,8 @@ clipmenu	Clipboard manager using dmenu/rofi
 playerctl	MPRIS media player CLI
 xdg-utils	XDG desktop integration scripts
 xdg-user-dirs	Manage XDG user directories
+xdg-desktop-portal	Portals API for sandboxed/browser screen share and file picker
+xdg-desktop-portal-gtk	GTK backend for xdg-desktop-portal
 networkmanager	Network connection manager
 bluez	Bluetooth protocol stack
 bluez-utils	Bluetooth utilities (bluetoothctl)
@@ -66,6 +73,12 @@ btop	Resource monitor
 httpie	Human-friendly HTTP client
 bind	DNS tools including dig
 nmap	Network exploration and security scanner
+wget	Non-interactive network downloader
+rsync	Incremental file transfer
+unzip	ZIP archive extractor
+zip	ZIP archive creator
+p7zip	7z/rar/etc archive tool
+tree	Directory tree viewer
 python-pipx	Install Python apps in isolated venvs
 uv	Fast Python package and project manager
 docker	Container runtime
