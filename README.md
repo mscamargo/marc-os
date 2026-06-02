@@ -34,9 +34,9 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
 
 For a fresh machine, boot the Arch ISO and run:
 
-    curl -L https://mscamargo.github.io/marc-os/iso-bootstrap | bash
+    curl -L https://mscamargo.github.io/marc-os/marc-os.sh | bash
 
-`iso-bootstrap` is a 10-line entry script that `pacman -Sy git`, clones this
+`marc-os.sh` is a 10-line entry script that `pacman -Sy git`, clones this
 repo to `/root/marc-os`, and execs `./bootstrap.sh`. `bootstrap.sh` prompts
 for hostname/disk/CPU (with detected defaults), asks you to retype the disk
 path to confirm wipe, then partitions (1G ESP + ext4 root + 8G swapfile),
@@ -164,7 +164,7 @@ full style guide.
 
 ## Structure
 
-- `iso-bootstrap` / `bootstrap.sh` — bare-metal installer; replaces
+- `marc-os.sh` / `bootstrap.sh` — bare-metal installer; replaces
   archinstall. Run on the Arch ISO, not on an installed system.
 - `install.sh` / `configure.sh` / `doctor.sh` — entry points (run on an
   installed system as your user).

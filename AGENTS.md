@@ -8,7 +8,7 @@ no CI.
 
 | Path | Purpose |
 |------|---------|
-| `iso-bootstrap` | Curl-bash entry on the Arch ISO. `pacman -Sy git`, clone repo to `/root/marc-os`, `exec bootstrap.sh`. Extensionless on purpose (URL endpoint). Not picked up by `check.sh` because its glob is `*.sh`; lint manually if edited. |
+| `marc-os.sh` | Curl-bash entry on the Arch ISO. `pacman -Sy git`, clone repo to `/root/marc-os`, `exec bootstrap.sh`. Served via GitHub Pages as the URL endpoint. |
 | `bootstrap.sh` | Bare-metal Arch installer (replaces archinstall). Runs as root on the Arch ISO. Prompts hostname/disk/microcode (detected defaults), retype-disk-path confirmation, then partitions GPT (1G ESP + ext4 root), 8G swapfile, pacstraps a minimal base, chroot-configures locale/keymap/timezone/hostname/systemd-boot/NetworkManager, creates user (wheel password-prompted, root locked), clones marc-os to `~$USER/Work/marc-os`. Console-only output, no log file. EXIT trap unmounts `/mnt`. UEFI-only. Re-runs wipe from scratch. |
 | `install.sh` | New-machine setup entry point. `main` runs `check` → `bootstrap` → `install_packages` → `setup_shell` → `dot::configure` end-to-end. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. Only flag is `-h`/`--help`. |
 | `configure.sh` | Re-link dotfiles only. `log::assert_non_root` + `dot::configure`. No flags, no log file. |
@@ -190,10 +190,6 @@ After any change, run:
 ./doctor.sh       # zero drift (on a marc-os host)
 ```
 
-`check.sh` globs `*.sh`, so `iso-bootstrap` (extensionless) is skipped — if
-you edit it, manually run `shellcheck --shell=bash iso-bootstrap` and
-`shfmt -d -i 4 -ci -sr -bn iso-bootstrap`.
-
 For an end-to-end test of marc-os, restore a fresh VM, sync the repo, then
 inside the VM: `./install.sh && ./doctor.sh && ./check.sh`.
 
@@ -220,7 +216,7 @@ Typical bootstrap-test loop:
 
 ```
 ./vm-recreate.sh                                              # fresh ISO boot
-# in guest: curl -L .../iso-bootstrap | bash                  # run bootstrap.sh
+# in guest: curl -L .../marc-os.sh | bash                     # run bootstrap.sh
 # in guest: poweroff                                          # after handoff message
 ./vm-boot-disk.sh                                             # reboot off the new disk
 # in guest: log in, cd ~/Work/marc-os && ./install.sh
