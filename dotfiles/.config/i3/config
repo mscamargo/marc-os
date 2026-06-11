@@ -13,12 +13,15 @@ bindsym $mod+Return exec alacritty
 bindsym $mod+Shift+q kill
 
 # Launcher
-bindsym $mod+d exec --no-startup-id rofi -show drun
+bindsym $mod+space exec --no-startup-id rofi -show drun
 bindsym $mod+Shift+d exec --no-startup-id rofi -show run
 bindsym $mod+Tab exec --no-startup-id rofi -show window
 
 # Clipboard history
 bindsym $mod+v exec --no-startup-id clipmenu
+
+# Dismiss notification (dunst)
+bindsym $mod+comma exec --no-startup-id dunstctl close
 
 # Focus (vim)
 bindsym $mod+h focus left
@@ -40,10 +43,13 @@ bindsym $mod+e layout toggle split
 # Fullscreen / floating
 bindsym $mod+f fullscreen toggle
 bindsym $mod+Shift+space floating toggle
-bindsym $mod+space focus mode_toggle
+bindsym $mod+t focus mode_toggle
 
 # Focus parent
 bindsym $mod+a focus parent
+
+# Window rules
+for_window [class="Alacritty"] border pixel 1
 
 # Workspace-to-monitor assignment
 # External monitor (DP-1): workspaces 1-5
