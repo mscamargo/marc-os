@@ -13,7 +13,7 @@ source "$__HOOK_DIR/../lib/packages.sh"
 # 1. Blacklist nouveau and enable the NVIDIA DRM kernel mode setting that
 #    render offload requires.
 modprobe_conf=/etc/modprobe.d/marc-os-nvidia.conf
-read -r -d '' desired_modprobe <<'EOF' || true
+read -r -d '' desired_modprobe << 'EOF' || true
 # marc-os: NVIDIA PRIME render offload — Intel primary, NVIDIA on demand
 blacklist nouveau
 options nvidia_drm modeset=1 fbdev=1
