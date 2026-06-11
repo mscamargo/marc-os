@@ -18,10 +18,7 @@ Personal Arch Linux setup. Installs a minimal i3wm environment.
   generating an ed25519 SSH key, materializing `mise` runtimes)
 - Keeps the sudo timestamp warm during the install loop so long AUR builds
   don't re-prompt
-- Symlinks every file under `dotfiles/` into `$HOME` (per-leaf), auto-migrating
-  any legacy dir-symlinks, and prunes stale links pointing into the repo
-- Sets zsh as the default shell and removes legacy
-  `~/.bash{rc,_profile,_logout}` so they don't shadow zsh
+- Sets zsh as the default shell
 - Logs each `install.sh` run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 
 ## Requirements
@@ -50,19 +47,18 @@ output is console-only. UEFI-only, no encryption, no LVM, no btrfs.
 
 ## Usage
 
-Three top-level scripts, no flags:
+Two top-level scripts, no flags:
 
     ./install.sh        # new-machine setup, end-to-end
-    ./configure.sh      # re-link dotfiles only (the frequent loop)
     ./doctor.sh         # read-only drift report; exits 1 on drift
 
-`install.sh` runs `check` → `bootstrap` → `install_packages` → `setup_shell` →
-`dot::configure` in order. All three scripts are idempotent: every helper
-self-skips work that's already done.
+`install.sh` runs `check` → `bootstrap` → `install_packages` → `setup_shell`
+in order. Both scripts are idempotent: every helper self-skips work that's
+already done.
 
 `install.sh` tees its output to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`
 (defaults to `~/.local/state/marc-os/`). No rotation; clean up manually.
-`configure.sh` and `doctor.sh` print to the terminal only.
+`doctor.sh` prints to the terminal only.
 
 After installation, restart your shell or run `exec zsh -l`. Log in on a
 TTY and run `startx` to launch i3.
@@ -107,36 +103,13 @@ exact shape. The common "enable + start a unit" pattern is
 
 ## Dotfiles
 
-Layout mirrors `$HOME` literally: `dotfiles/X` is symlinked to `$HOME/X`,
-file by file. Examples:
-
-| Repo path | Target |
-|-----------|--------|
-| `dotfiles/.zshrc` | `~/.zshrc` |
-| `dotfiles/.config/nvim/init.lua` | `~/.config/nvim/init.lua` |
-| `dotfiles/.config/mise/config.toml` | `~/.config/mise/config.toml` |
-| `dotfiles/.config/tmux/tmux.conf` | `~/.config/tmux/tmux.conf` |
-| `dotfiles/.ssh/config` | `~/.ssh/config` |
-| `dotfiles/.local/bin/screenshot-full` | `~/.local/bin/screenshot-full` |
-
-Adding a new dotfile: drop the file at its mirrored path under `dotfiles/`
-and re-run `./configure.sh`. No script edit.
-
-Leaf-level linking means target directories are real, so files an app writes
-into `~/.config/<x>/` (plugin lockfiles, sessions, history, …) stay in the
-target tree and never dirty the repo. The first run after upgrading from the
-old dir-symlink layout transparently replaces ancestor dir-symlinks with
-real directories.
-
-`dot::configure` also prunes any symlink that resolves into the repo but
-whose target file is gone — so deleting a file from `dotfiles/` is enough;
-the next `./configure.sh` run cleans up the orphan link.
+Dotfiles live in a separate repository and are no longer managed here. This
+repo installs packages and configures the system only.
 
 ## Architecture
 
 ```
 install.sh ────┐
-configure.sh ──┤
 doctor.sh ─────┤
 hooks/*.sh ────┤   (each script self-sources only what it directly calls)
                ▼
@@ -147,7 +120,6 @@ hooks/*.sh ────┤   (each script self-sources only what it directly cal
         ├──────────────┤
         │  lib/sudo.sh │  ──▶ lib/log.sh
         │ lib/lists.sh │  ──▶ lib/log.sh
-        │ lib/dotfiles │  ──▶ lib/log.sh
         │ lib/packages │  ──▶ lib/{log,util,lists}.sh
         └──────────────┘
 ```
@@ -166,18 +138,17 @@ full style guide.
 
 - `marc-os.sh` / `bootstrap.sh` — bare-metal installer; replaces
   archinstall. Run on the Arch ISO, not on an installed system.
-- `install.sh` / `configure.sh` / `doctor.sh` — entry points (run on an
-  installed system as your user).
+- `install.sh` / `doctor.sh` — entry points (run on an installed system as
+  your user).
 - `check.sh` — runs `shellcheck -x` + `shfmt -d -i 4 -ci -sr -bn` over
   every `*.sh`. Self-contained.
-- `lib/` — shared modules (`log`, `util`, `sudo`, `lists`, `packages`,
-  `dotfiles`). One concept per file. See "Architecture" above.
+- `lib/` — shared modules (`log`, `util`, `sudo`, `lists`, `packages`).
+  One concept per file. See "Architecture" above.
 - `data/` — TAB-separated package lists: `pacman.list`, `aur.list`,
   `git_src.list`.
 - `hooks/` — per-package install hooks, discovered by filename convention
   (`<package>.pre.sh`, `<package>.post.sh`). Each is subshell-executed
   with its own preamble.
-- `dotfiles/` — mirrors `$HOME`. Every file is leaf-symlinked into place.
 - `vm-*.sh` — helper scripts for QEMU VM workflows.
 
 ## License

@@ -1,8 +1,8 @@
 # AGENTS.md — marc-os
 
 Personal Arch Linux setup. Shell scripts that bare-metal install Arch and
-then layer the i3wm stack + dotfiles on top. No package manager, no tests,
-no CI.
+then layer the i3wm stack on top. No package manager, no tests, no CI.
+Dotfiles live in a separate repository.
 
 ## Repository structure
 
@@ -10,35 +10,31 @@ no CI.
 |------|---------|
 | `marc-os.sh` | Curl-bash entry on the Arch ISO. `pacman -Sy git`, clone repo to `/root/marc-os`, `exec bootstrap.sh`. Served via GitHub Pages as the URL endpoint. |
 | `bootstrap.sh` | Bare-metal Arch installer (replaces archinstall). Runs as root on the Arch ISO. Prompts hostname/disk/microcode (detected defaults), retype-disk-path confirmation, then partitions GPT (1G ESP + ext4 root), 8G swapfile, pacstraps a minimal base, chroot-configures locale/keymap/timezone/hostname/systemd-boot/NetworkManager, creates user (wheel password-prompted, root locked), clones marc-os to `~$USER/Work/marc-os`. Console-only output, no log file. EXIT trap unmounts `/mnt`. UEFI-only. Re-runs wipe from scratch. |
-| `install.sh` | New-machine setup entry point. `main` runs `check` → `bootstrap` → `install_packages` → `setup_shell` → `dot::configure` end-to-end. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. Only flag is `-h`/`--help`. |
-| `configure.sh` | Re-link dotfiles only. `log::assert_non_root` + `dot::configure`. No flags, no log file. |
-| `doctor.sh` | Read-only drift report. `log::assert_non_root` + walk `data/*.list` and `dotfiles/`, exit non-zero on drift. No flags, no log file. |
+| `install.sh` | New-machine setup entry point. `main` runs `check` → `bootstrap` → `install_packages` → `setup_shell` end-to-end. Tees each run to `$XDG_STATE_HOME/marc-os/install-<timestamp>.log`. Only flag is `-h`/`--help`. |
+| `doctor.sh` | Read-only drift report. `log::assert_non_root` + walk `data/*.list`, exit non-zero on drift. No flags, no log file. |
 | `check.sh` | Self-contained lint script. Runs `shellcheck -x` + `shfmt -d -i 4 -ci -sr -bn` over every `*.sh`. Sources no lib. |
 | `lib/log.sh` | `log::{info,warn,error,success,die,assert_non_root}` + color constants. No deps. |
 | `lib/util.sh` | `util::has_command`. No deps. |
 | `lib/sudo.sh` | `sudo::{keepalive_start,keepalive_stop}` + `SUDO_KEEPALIVE_INTERVAL`. Depends on log. |
 | `lib/lists.sh` | `lists::for_each_row <list> <cb>`. Depends on log. |
 | `lib/packages.sh` | `pkg::*` — install (pacman/aur/git), enable services, tune `pacman.conf`, bootstrap yay, dispatch hooks, walk lists. Owns `PKG_SRC_ROOT`. Depends on log, util, lists. |
-| `lib/dotfiles.sh` | `dot::*` — readlink wrapper, ancestor migration, leaf-link, prune, top-level configure. Depends on log. |
 | `data/pacman.list` | TAB-separated `name<TAB>description` rows. One per pacman package. |
 | `data/aur.list` | TAB-separated `name<TAB>description` rows. One per AUR (yay) package. |
 | `data/git_src.list` | TAB-separated `url<TAB>description` rows. Each is `git clone`d shallow into `$PKG_SRC_ROOT/<basename-without-.git>`. |
 | `hooks/<pkg>.{pre,post}.sh` | Optional pre/post-install scripts. Discovered by filename; `<pkg>` is the row's name (or repo basename for git rows). |
-| `dotfiles/` | Mirrors `$HOME`. Every file is leaf-symlinked into place by `dot::configure`. |
 | `vm-*.sh` | QEMU/quickemu helpers for testing in a VM. |
 
 ## Entry points
 
-Four single-purpose scripts at the root. `bootstrap.sh` is one-shot
+Three single-purpose scripts at the root. `bootstrap.sh` is one-shot
 (destructive); the rest are idempotent — every helper self-skips work
 that's already done, so re-running is safe.
 
 | Script | Steps | Pre-flight | Re-runnable? |
 |--------|-------|-----------|--------------|
 | `bootstrap.sh` | prompts → `partition` → `format_and_mount` → `pacstrap_base` → `write_fstab_and_swap` → `configure_chroot` → `create_user` → `clone_repo` → `handoff` | root + Arch ISO + UEFI + tools (`pacstrap`, `arch-chroot`, `sgdisk`, `wipefs`, `genfstab`, `blkid`, `mkfs.*`, `mkswap`, `partprobe`, `udevadm`, `lsblk`) + internet | One-shot; re-runs wipe from scratch via `sgdisk --zap-all && wipefs -af` |
-| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell`, `dot::configure` | Arch + non-root + pacman + internet | Yes |
-| `configure.sh` | `dot::configure` | non-root | Yes |
-| `doctor.sh` | walk `data/*.list` + `dotfiles/`; report missing pkgs, wrong/missing/shadowed links, orphan in-repo links | non-root | Yes |
+| `install.sh` | `check`, `bootstrap`, `install_packages`, `setup_shell` | Arch + non-root + pacman + internet | Yes |
+| `doctor.sh` | walk `data/*.list`; report missing pkgs | non-root | Yes |
 
 ### `install.sh` step breakdown
 
@@ -48,7 +44,6 @@ that's already done, so re-running is safe.
 | `bootstrap`        | `pkg::tune_pacman_conf /etc/pacman.conf` (Color, ILoveCandy, ParallelDownloads, VerbosePkgLists, `[multilib]`), `pkg::refresh_keyring`, `pacman -Syu`, `pkg::install_pacman base-devel git`, `pkg::bootstrap_aur_helper`. |
 | `install_packages` | `sudo::keepalive_start`, then `pkg::install_list` for `data/pacman.list`, `data/aur.list`, `data/git_src.list` (each runs per-row hooks); `sudo::keepalive_stop`. |
 | `setup_shell`      | `chsh -s zsh` if not already default. |
-| `dot::configure`   | Shared with `configure.sh`. Leaf-symlink every file under `dotfiles/` into `$HOME`, prune stale symlinks resolving into the repo, unconditionally `rm` `~/.bash{rc,_profile,_logout}` (skipping symlinks). |
 
 `-h` / `--help` prints usage. Any other flag exits non-zero.
 
@@ -83,8 +78,8 @@ helpers; current internal helpers use a single-underscore prefix
 `tee`s stdout and stderr to it via `exec > >(tee -a ...) 2> >(tee -a ... >&2)`.
 ANSI codes are preserved in the log; read with `less -R`. No rotation. The
 last 1–2 lines may not flush on `set -e` crashes (process-substitution
-limitation). `bootstrap.sh`, `configure.sh`, and `doctor.sh` do not log to
-a file — console only.
+limitation). `bootstrap.sh` and `doctor.sh` do not log to a file — console
+only.
 
 ## data/*.list format
 
@@ -150,11 +145,11 @@ then `corepack enable`).
 Conventions every script in this repo follows. New code should match.
 
 - **Modules**: shared code lives in `lib/<name>.sh`, one concept per file.
-  Entry points (`install.sh`, `configure.sh`, `doctor.sh`) stay at the
-  repo root. `check.sh` is self-contained (it lints the lib).
+  Entry points (`install.sh`, `doctor.sh`) stay at the repo root. `check.sh`
+  is self-contained (it lints the lib).
 - **Naming**: every public lib function uses `module::function` form
-  (`log::info`, `pkg::install_pacman`, `dot::link`, …). Helpers internal to
-  one module use `module::_name`. Entry-point top-level functions stay
+  (`log::info`, `pkg::install_pacman`, `lists::for_each_row`, …). Helpers
+  internal to one module use `module::_name`. Entry-point top-level functions stay
   un-namespaced (`check`, `bootstrap`, `install_packages`, `setup_shell`).
 - **Self-sourcing**: every `lib/*.sh` opens with a sentinel-var guard and
   sources its own deps:

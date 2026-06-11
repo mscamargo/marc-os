@@ -10,8 +10,6 @@ source "$SCRIPT_DIR/lib/util.sh"
 source "$SCRIPT_DIR/lib/sudo.sh"
 # shellcheck source=lib/packages.sh
 source "$SCRIPT_DIR/lib/packages.sh"
-# shellcheck source=lib/dotfiles.sh
-source "$SCRIPT_DIR/lib/dotfiles.sh"
 
 usage() {
     cat << EOF
@@ -24,10 +22,7 @@ End-to-end new-machine setup, run in order:
               pacman -Syu, install base-devel + git, bootstrap yay
   install     Install every row in data/{pacman,aur,git_src}.list; run hooks
   shell       chsh -s zsh
-  configure   Leaf-symlink dotfiles/ into \$HOME, prune stale links,
-              remove legacy ~/.bash{rc,_profile,_logout}
 
-For re-linking dotfiles only, use ./configure.sh.
 For a read-only drift report, use ./doctor.sh.
 
 Each run is logged to \$XDG_STATE_HOME/marc-os/install-<timestamp>.log
@@ -125,7 +120,6 @@ main() {
     bootstrap
     install_packages
     setup_shell
-    dot::configure "$SCRIPT_DIR/dotfiles" "$HOME"
 
     log::success "Setup complete. Restart your shell or run: exec zsh -l"
 }

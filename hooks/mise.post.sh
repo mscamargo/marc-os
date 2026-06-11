@@ -14,7 +14,7 @@ fi
 cfg="$HOME/.config/mise/config.toml"
 if [[ ! -f "$cfg" ]]; then
     log::warn "mise config.toml not found at $cfg; skipping mise install"
-    log::warn "Re-run after dotfiles are linked (configure.sh)"
+    log::warn "Re-run after your dotfiles provide $cfg"
     exit 0
 fi
 
