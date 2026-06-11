@@ -4,6 +4,14 @@ xorg-xinit	startx and xinit helpers
 xorg-xrandr	RandR CLI for display config
 xorg-xsetroot	Root window utility
 xorg-xset	X server preferences CLI (used by i3 idle config)
+mesa-utils	OpenGL diagnostics (glxinfo, glxgears)
+vulkan-tools	Vulkan diagnostics (vulkaninfo, vkcube)
+vulkan-intel	Intel Vulkan driver (ICD) for Iris Xe
+lib32-vulkan-intel	32-bit Intel Vulkan driver
+nvidia-open	NVIDIA open kernel modules (Turing+; stock linux kernel)
+nvidia-utils	NVIDIA userspace libraries and tools
+nvidia-prime	PRIME render offload wrapper (prime-run)
+lib32-nvidia-utils	32-bit NVIDIA userspace libraries
 pipewire	Modern audio/video server
 pipewire-pulse	PulseAudio replacement for PipeWire
 pipewire-alsa	ALSA compatibility for PipeWire
